@@ -20,6 +20,9 @@ try:
 except json.JSONDecodeError as e:
     raise ValueError(f"Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}")
 
+# Fix escaped newlines in private_key
+firebase_credentials["private_key"] = firebase_credentials["private_key"].replace("\\n", "\n")
+
 # Initialize Firebase directly with the dictionary
 cred = credentials.Certificate(firebase_credentials)
 firebase_admin.initialize_app(cred)
