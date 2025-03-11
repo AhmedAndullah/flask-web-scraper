@@ -14,67 +14,85 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from webdriver_manager.firefox import GeckoDriverManager
 from bs4 import BeautifulSoup
 import os
+import logging
+import subprocess
 
-def fetch_html(browser="edge"):
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def fetch_html(browser="chrome"):  # Default to Chrome
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
     # Common options for all browsers
     common_options = [
-        "--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage",
-        "--disable-images", "--blink-settings=imagesEnabled=false", "--disable-extensions"
+        "--headless=new",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-images",
+        "--blink-settings=imagesEnabled=false",
+        "--disable-extensions",
+        "--window-size=1920,1080"
     ]
 
-    options = None  # Initialize options
+    options = None
     service = None
     driver_class = None
 
     try:
         if browser.lower() == "chrome":
             options = ChromeOptions()
-            service = ChromeService(ChromeDriverManager().install())
+            chromedriver_path = ChromeDriverManager(version="latest").install()
+            # Ensure chromedriver is executable
+            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
+            service = ChromeService(chromedriver_path)
             driver_class = webdriver.Chrome
-            print("Initializing Chrome driver...")
+            logger.info("Initializing Chrome driver...")
 
         elif browser.lower() == "edge":
             options = EdgeOptions()
-            service = EdgeService(EdgeChromiumDriverManager().install())
+            chromedriver_path = EdgeChromiumDriverManager().install()
+            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
+            service = EdgeService(chromedriver_path)
             driver_class = webdriver.Edge
-            print("Initializing Edge driver...")
+            logger.info("Initializing Edge driver...")
 
         elif browser.lower() == "firefox":
             options = FirefoxOptions()
-            service = FirefoxService(GeckoDriverManager().install())
+            geckodriver_path = GeckoDriverManager().install()
+            subprocess.run(["chmod", "+x", geckodriver_path], check=True)
+            service = FirefoxService(geckodriver_path)
             driver_class = webdriver.Firefox
-            print("Initializing Firefox driver...")
+            logger.info("Initializing Firefox driver...")
 
         elif browser.lower() == "opera":
-            print("Opera not directly supported, using Chrome settings instead.")
+            logger.warning("Opera not directly supported, using Chrome settings instead.")
             options = ChromeOptions()
-            service = ChromeService(ChromeDriverManager().install())
+            chromedriver_path = ChromeDriverManager(version="latest").install()
+            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
+            service = ChromeService(chromedriver_path)
             driver_class = webdriver.Chrome
 
         else:
-            print(f"Unsupported browser '{browser}', defaulting to Edge.")
-            options = EdgeOptions()
-            service = EdgeService(EdgeChromiumDriverManager().install())
-            driver_class = webdriver.Edge
+            logger.warning(f"Unsupported browser '{browser}', defaulting to Chrome.")
+            options = ChromeOptions()
+            chromedriver_path = ChromeDriverManager(version="latest").install()
+            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
+            service = ChromeService(chromedriver_path)
+            driver_class = webdriver.Chrome
 
-        # Apply common options **after** initializing `options`
+        # Apply common options after initializing options
         for arg in common_options:
             options.add_argument(arg)
+
+        # Initialize the driver
+        driver = driver_class(service=service, options=options)
 
     except Exception as e:
-        print(f"Error initializing driver for {browser}: {e}")
-        print("Falling back to Edge as a default browser.")
-        options = EdgeOptions()
-        service = EdgeService(EdgeChromiumDriverManager().install())
-        driver_class = webdriver.Edge
-        for arg in common_options:
-            options.add_argument(arg)
-
-    # Initialize the driver
-    driver = driver_class(service=service, options=options)
+        logger.error(f"Error initializing driver for {browser}: {e}")
+        return "<h1>Error: Could not initialize browser driver. Please try again later.</h1>"
 
     try:
         driver.get(url)
@@ -93,10 +111,10 @@ def fetch_html(browser="edge"):
         html_content = driver.execute_script("return document.documentElement.outerHTML")
 
         # Debugging output
-        print("===== ORIGINAL HTML SNIPPET (AFTER JS) =====")
+        logger.info("===== ORIGINAL HTML SNIPPET (AFTER JS) =====")
         soup = BeautifulSoup(html_content, 'html.parser')
-        print([tag['src'] for tag in soup.find_all(src=True)][:10])
-        print("=================================")
+        logger.info([tag['src'] for tag in soup.find_all(src=True)][:10])
+        logger.info("=================================")
 
         # Modify HTML using BeautifulSoup
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -112,21 +130,22 @@ def fetch_html(browser="edge"):
         modified_html = str(soup)
 
         # Debugging output after modification
-        print("===== MODIFIED HTML SNIPPET =====")
-        print([tag['src'] for tag in BeautifulSoup(modified_html, 'html.parser').find_all(src=True)][:10])
-        print("=================================")
+        logger.info("===== MODIFIED HTML SNIPPET =====")
+        logger.info([tag['src'] for tag in BeautifulSoup(modified_html, 'html.parser').find_all(src=True)][:10])
+        logger.info("=================================")
 
     except Exception as e:
-        print(f"Error during scraping: {e}")
-        raise
+        logger.error(f"Error during scraping: {e}")
+        modified_html = "<h1>Error: Could not load content. Please try again later.</h1>"
+
     finally:
         driver.quit()
 
     return modified_html
 
 if __name__ == "__main__":
-    browser = os.getenv("BROWSER", "edge")
-    print(f"Using browser: {browser}")
+    browser = os.getenv("BROWSER", "chrome")
+    logger.info(f"Using browser: {browser}")
     html_content = fetch_html(browser)
     with open("output.html", "w", encoding="utf-8") as f:
         f.write(html_content)
