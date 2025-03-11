@@ -18,7 +18,7 @@ from selenium.common.exceptions import WebDriverException
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fetch_html(browser="chrome", retries=2):
+def fetch_html(browser="chrome", max_retries=2):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
@@ -65,67 +65,56 @@ def fetch_html(browser="chrome", retries=2):
         "--log-path=/tmp/chrome.log"  # Save logs to a file
     ]
 
-    options = None
-    service = None
-    driver_class = None
-    use_safari_user_agent = False
-
-    try:
-        # Check if we're on macOS and Safari is requested
-        is_macos = platform.system().lower() == "darwin"
-        if browser.lower() == "safari":
-            if is_macos:
-                options = SafariOptions()
-                driver_class = webdriver.Safari
-                logger.info("Initializing Safari driver on macOS...")
+    driver = None
+    for attempt in range(max_retries):
+        try:
+            # Check if we're on macOS and Safari is requested
+            is_macos = platform.system().lower() == "darwin"
+            if browser.lower() == "safari":
+                if is_macos:
+                    options = SafariOptions()
+                    driver = webdriver.Safari(options=options)
+                    logger.info("Initializing Safari driver on macOS...")
+                else:
+                    logger.warning("Safari is not supported on non-macOS systems. Falling back to Chrome with Safari user-agent.")
+                    options = ChromeOptions()
+                    chromedriver_path = ChromeDriverManager().install()
+                    subprocess.run(["chmod", "+x", chromedriver_path], check=True)
+                    service = ChromeService(chromedriver_path)
+                    driver = webdriver.Chrome(service=service, options=options)
+                    options.add_argument(f"--user-agent={safari_user_agent}")
+                    logger.info("Initializing Chrome driver with Safari user-agent...")
             else:
-                logger.warning("Safari is not supported on non-macOS systems. Falling back to Chrome with Safari user-agent.")
                 options = ChromeOptions()
                 chromedriver_path = ChromeDriverManager().install()
                 subprocess.run(["chmod", "+x", chromedriver_path], check=True)
                 service = ChromeService(chromedriver_path)
-                driver_class = webdriver.Chrome
-                use_safari_user_agent = True
-                logger.info("Initializing Chrome driver with Safari user-agent...")
-        else:
-            options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager().install()
-            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
-            service = ChromeService(chromedriver_path)
-            driver_class = webdriver.Chrome
-            logger.info("Initializing Chrome driver...")
+                driver = webdriver.Chrome(service=service, options=options)
+                logger.info("Initializing Chrome driver...")
 
-        # Apply Chrome options if using Chrome
-        if isinstance(options, ChromeOptions):
-            for arg in chrome_options:
-                options.add_argument(arg)
-            if use_safari_user_agent:
-                options.add_argument(f"--user-agent={safari_user_agent}")
+            # Apply Chrome options
+            if isinstance(options, ChromeOptions):
+                for arg in chrome_options:
+                    options.add_argument(arg)
 
-        # Initialize the driver
-        driver = driver_class(service=service, options=options) if service else driver_class(options=options)
-        logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
+            logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds (attempt {attempt + 1}/{max_retries})")
 
-    except Exception as e:
-        logger.error(f"Error initializing driver for {browser}: {e}")
-        if "disconnected" in str(e).lower() or "session deleted" in str(e).lower():
-            logger.error("Chrome likely crashed during initialization. Consider increasing memory or optimizing options.")
-        return "<h1>Error: Could not initialize browser driver. Please try again later.</h1>"
+            # Load the URL
+            logger.info(f"Loading URL (attempt {attempt + 1}/{max_retries})...")
+            driver.get(url)
+            logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
+            break  # Success, exit the retry loop
+
+        except WebDriverException as e:
+            logger.warning(f"Failed to load URL on attempt {attempt + 1}: {e}")
+            if driver:
+                driver.quit()
+            if attempt == max_retries - 1:  # Last attempt
+                logger.error(f"All {max_retries} attempts failed: {e}")
+                raise e
+            time.sleep(2)  # Wait longer before retrying
 
     try:
-        # Retry loading the URL in case of transient failures
-        for attempt in range(retries):
-            try:
-                logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
-                driver.get(url)
-                logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
-                break  # Success, exit the retry loop
-            except WebDriverException as e:
-                logger.warning(f"Failed to load URL on attempt {attempt + 1}: {e}")
-                if attempt == retries - 1:  # Last attempt
-                    raise e
-                time.sleep(1)  # Wait before retrying
-
         # Use WebDriverWait for dynamic content
         wait = WebDriverWait(driver, 10)
         region_select = wait.until(EC.presence_of_element_located((By.ID, "anonymous_oe")))
@@ -177,7 +166,8 @@ def fetch_html(browser="chrome", retries=2):
         modified_html = "<h1>Error: Could not load content. Please try again later.</h1>"
 
     finally:
-        driver.quit()
+        if driver:
+            driver.quit()
         logger.info(f"Total scraping time: {time.time() - start_time:.2f} seconds")
 
     return modified_html
