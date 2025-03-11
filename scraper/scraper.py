@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 import os
 import logging
 import subprocess
+import time
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 def fetch_html(browser="chrome"):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
+    start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
     # Common options for all browsers
@@ -34,7 +36,20 @@ def fetch_html(browser="chrome"):
         "--disable-images",
         "--blink-settings=imagesEnabled=false",
         "--disable-extensions",
-        "--window-size=1920,1080"
+        "--window-size=1280,720",  # Reduce window size to lower memory usage
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-client-side-phishing-detection",
+        "--disable-default-apps",
+        "--disable-hang-monitor",
+        "--disable-prompt-on-repost",
+        "--disable-sync",
+        "--disable-translate",
+        "--metrics-recording-only",
+        "--no-first-run",
+        "--safebrowsing-disable-auto-update",
+        "--disable-javascript-harmony-shipping",
+        "--disable-renderer-backgrounding"
     ]
 
     options = None
@@ -44,8 +59,7 @@ def fetch_html(browser="chrome"):
     try:
         if browser.lower() == "chrome":
             options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager().install()  # Remove version parameter
-            # Ensure chromedriver is executable
+            chromedriver_path = ChromeDriverManager().install()
             subprocess.run(["chmod", "+x", chromedriver_path], check=True)
             service = ChromeService(chromedriver_path)
             driver_class = webdriver.Chrome
@@ -70,7 +84,7 @@ def fetch_html(browser="chrome"):
         elif browser.lower() == "opera":
             logger.warning("Opera not directly supported, using Chrome settings instead.")
             options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager().install()  # Remove version parameter
+            chromedriver_path = ChromeDriverManager().install()
             subprocess.run(["chmod", "+x", chromedriver_path], check=True)
             service = ChromeService(chromedriver_path)
             driver_class = webdriver.Chrome
@@ -78,7 +92,7 @@ def fetch_html(browser="chrome"):
         else:
             logger.warning(f"Unsupported browser '{browser}', defaulting to Chrome.")
             options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager().install()  # Remove version parameter
+            chromedriver_path = ChromeDriverManager().install()
             subprocess.run(["chmod", "+x", chromedriver_path], check=True)
             service = ChromeService(chromedriver_path)
             driver_class = webdriver.Chrome
@@ -89,26 +103,33 @@ def fetch_html(browser="chrome"):
 
         # Initialize the driver
         driver = driver_class(service=service, options=options)
+        logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
     except Exception as e:
         logger.error(f"Error initializing driver for {browser}: {e}")
         return "<h1>Error: Could not initialize browser driver. Please try again later.</h1>"
 
     try:
+        logger.info("Loading URL...")
         driver.get(url)
+        logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
         # Use WebDriverWait for dynamic content
         wait = WebDriverWait(driver, 10)
         region_select = wait.until(EC.presence_of_element_located((By.ID, "anonymous_oe")))
         Select(region_select).select_by_visible_text("Region Hannover")
+        logger.info(f"Region selected in {time.time() - start_time:.2f} seconds")
 
         subject_area_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Innere Medizin")))
         subject_area_link.click()
+        logger.info(f"Subject area clicked in {time.time() - start_time:.2f} seconds")
 
         department_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Allgemeine Innere Medizin")))
         department_link.click()
+        logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
 
         html_content = driver.execute_script("return document.documentElement.outerHTML")
+        logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
 
         # Debugging output
         logger.info("===== ORIGINAL HTML SNIPPET (AFTER JS) =====")
@@ -140,6 +161,7 @@ def fetch_html(browser="chrome"):
 
     finally:
         driver.quit()
+        logger.info(f"Total scraping time: {time.time() - start_time:.2f} seconds")
 
     return modified_html
 
