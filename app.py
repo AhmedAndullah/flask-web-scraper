@@ -12,8 +12,15 @@ cache = Cache(app, config={"CACHE_TYPE": "simple"})
 # Initialize Firebase
 firebase_credentials = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
 
-cred = credentials.Certificate(firebase_credentials)
+# Write the credentials to a temporary file
+with open("/tmp/firebase_key.json", "w") as f:
+    json.dump(firebase_credentials, f)
+
+# Use the temporary file to initialize Firebase
+cred = credentials.Certificate("/tmp/firebase_key.json")
 firebase_admin.initialize_app(cred)
+
+# Initialize Firestore
 db = firestore.client()
 
 def detect_browser(user_agent):
