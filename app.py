@@ -10,14 +10,18 @@ app = Flask(__name__)
 cache = Cache(app, config={"CACHE_TYPE": "simple"})
 
 # Initialize Firebase
-firebase_credentials = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
+firebase_credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+if not firebase_credentials_json:
+    raise ValueError("Environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON is not set")
 
-# Write the credentials to a temporary file
-with open("/tmp/firebase_key.json", "w") as f:
-    json.dump(firebase_credentials, f)
+# Parse the JSON string into a dictionary
+try:
+    firebase_credentials = json.loads(firebase_credentials_json)
+except json.JSONDecodeError as e:
+    raise ValueError(f"Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}")
 
-# Use the temporary file to initialize Firebase
-cred = credentials.Certificate("/tmp/firebase_key.json")
+# Initialize Firebase directly with the dictionary
+cred = credentials.Certificate(firebase_credentials)
 firebase_admin.initialize_app(cred)
 
 # Initialize Firestore
