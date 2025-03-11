@@ -12,12 +12,13 @@ import logging
 import subprocess
 import time
 import platform
+from selenium.common.exceptions import WebDriverException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fetch_html(browser="chrome"):
+def fetch_html(browser="chrome", retries=2):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
@@ -37,7 +38,7 @@ def fetch_html(browser="chrome"):
         "--disable-images",
         "--blink-settings=imagesEnabled=false",
         "--disable-extensions",
-        "--window-size=800,600",  # Even smaller window size
+        "--window-size=800,600",
         "--disable-background-networking",
         "--disable-background-timer-throttling",
         "--disable-client-side-phishing-detection",
@@ -53,12 +54,15 @@ def fetch_html(browser="chrome"):
         "--disable-renderer-backgrounding",
         "--single-process",
         "--disable-dev-tools",
-        "--disable-logging",  # Reduce logging overhead
-        "--disable-notifications",  # Disable notifications
-        "--mute-audio",  # Disable audio
-        "--disable-software-rasterizer",  # Avoid software rendering if possible
-        "--disable-features=TranslateUI",  # Disable translation UI
-        "--no-zygote"  # Run without zygote process to reduce memory
+        "--disable-logging",
+        "--disable-notifications",
+        "--mute-audio",
+        "--disable-software-rasterizer",
+        "--disable-features=TranslateUI",
+        "--no-zygote",
+        "--enable-logging",  # Enable Chrome logging for debugging
+        "--v=1",  # Verbose logging
+        "--log-path=/tmp/chrome.log"  # Save logs to a file
     ]
 
     options = None
@@ -104,15 +108,23 @@ def fetch_html(browser="chrome"):
 
     except Exception as e:
         logger.error(f"Error initializing driver for {browser}: {e}")
-        # Attempt to get more detailed crash info
         if "disconnected" in str(e).lower() or "session deleted" in str(e).lower():
-            logger.error("Chrome likely crashed due to resource issues. Consider increasing memory or optimizing options.")
+            logger.error("Chrome likely crashed during initialization. Consider increasing memory or optimizing options.")
         return "<h1>Error: Could not initialize browser driver. Please try again later.</h1>"
 
     try:
-        logger.info("Loading URL...")
-        driver.get(url)
-        logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
+        # Retry loading the URL in case of transient failures
+        for attempt in range(retries):
+            try:
+                logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
+                driver.get(url)
+                logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
+                break  # Success, exit the retry loop
+            except WebDriverException as e:
+                logger.warning(f"Failed to load URL on attempt {attempt + 1}: {e}")
+                if attempt == retries - 1:  # Last attempt
+                    raise e
+                time.sleep(1)  # Wait before retrying
 
         # Use WebDriverWait for dynamic content
         wait = WebDriverWait(driver, 10)
@@ -157,6 +169,11 @@ def fetch_html(browser="chrome"):
 
     except Exception as e:
         logger.error(f"Error during scraping: {e}")
+        # Check for Chrome logs if they exist
+        if os.path.exists("/tmp/chrome.log"):
+            with open("/tmp/chrome.log", "r") as log_file:
+                chrome_logs = log_file.read()
+                logger.error(f"Chrome logs:\n{chrome_logs}")
         modified_html = "<h1>Error: Could not load content. Please try again later.</h1>"
 
     finally:
