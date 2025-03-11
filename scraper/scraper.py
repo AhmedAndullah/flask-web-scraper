@@ -28,7 +28,7 @@ def fetch_html(browser="chrome"):
         "(KHTML, like Gecko) Version/17.5 Safari/605.1.15"
     )
 
-    # Common options for Chrome to reduce memory usage
+    # Optimized options for Chrome to reduce memory usage
     chrome_options = [
         "--headless=new",
         "--disable-gpu",
@@ -37,7 +37,7 @@ def fetch_html(browser="chrome"):
         "--disable-images",
         "--blink-settings=imagesEnabled=false",
         "--disable-extensions",
-        "--window-size=1024,600",
+        "--window-size=800,600",  # Even smaller window size
         "--disable-background-networking",
         "--disable-background-timer-throttling",
         "--disable-client-side-phishing-detection",
@@ -52,7 +52,13 @@ def fetch_html(browser="chrome"):
         "--disable-javascript-harmony-shipping",
         "--disable-renderer-backgrounding",
         "--single-process",
-        "--disable-dev-tools"
+        "--disable-dev-tools",
+        "--disable-logging",  # Reduce logging overhead
+        "--disable-notifications",  # Disable notifications
+        "--mute-audio",  # Disable audio
+        "--disable-software-rasterizer",  # Avoid software rendering if possible
+        "--disable-features=TranslateUI",  # Disable translation UI
+        "--no-zygote"  # Run without zygote process to reduce memory
     ]
 
     options = None
@@ -75,10 +81,9 @@ def fetch_html(browser="chrome"):
                 subprocess.run(["chmod", "+x", chromedriver_path], check=True)
                 service = ChromeService(chromedriver_path)
                 driver_class = webdriver.Chrome
-                use_safari_user_agent = True  # Use Safari user-agent with Chrome
+                use_safari_user_agent = True
                 logger.info("Initializing Chrome driver with Safari user-agent...")
         else:
-            # Default to Chrome
             options = ChromeOptions()
             chromedriver_path = ChromeDriverManager().install()
             subprocess.run(["chmod", "+x", chromedriver_path], check=True)
@@ -99,6 +104,9 @@ def fetch_html(browser="chrome"):
 
     except Exception as e:
         logger.error(f"Error initializing driver for {browser}: {e}")
+        # Attempt to get more detailed crash info
+        if "disconnected" in str(e).lower() or "session deleted" in str(e).lower():
+            logger.error("Chrome likely crashed due to resource issues. Consider increasing memory or optimizing options.")
         return "<h1>Error: Could not initialize browser driver. Please try again later.</h1>"
 
     try:
