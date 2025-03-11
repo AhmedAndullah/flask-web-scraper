@@ -1,22 +1,17 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.edge.service import Service as EdgeService
-from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.edge.options import Options as EdgeOptions
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from selenium.webdriver.support.ui import Select
+from selenium.webdriver.safari.options import Options as SafariOptions
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.microsoft import EdgeChromiumDriverManager
-from webdriver_manager.firefox import GeckoDriverManager
 from bs4 import BeautifulSoup
 import os
 import logging
 import subprocess
 import time
+import platform
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -27,8 +22,14 @@ def fetch_html(browser="chrome"):
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
-    # Common options for all browsers
-    common_options = [
+    # Safari user-agent to simulate Safari rendering if needed
+    safari_user_agent = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 "
+        "(KHTML, like Gecko) Version/17.5 Safari/605.1.15"
+    )
+
+    # Common options for Chrome to reduce memory usage
+    chrome_options = [
         "--headless=new",
         "--disable-gpu",
         "--no-sandbox",
@@ -36,7 +37,7 @@ def fetch_html(browser="chrome"):
         "--disable-images",
         "--blink-settings=imagesEnabled=false",
         "--disable-extensions",
-        "--window-size=1280,720",  # Reduce window size to lower memory usage
+        "--window-size=1024,600",
         "--disable-background-networking",
         "--disable-background-timer-throttling",
         "--disable-client-side-phishing-detection",
@@ -49,15 +50,35 @@ def fetch_html(browser="chrome"):
         "--no-first-run",
         "--safebrowsing-disable-auto-update",
         "--disable-javascript-harmony-shipping",
-        "--disable-renderer-backgrounding"
+        "--disable-renderer-backgrounding",
+        "--single-process",
+        "--disable-dev-tools"
     ]
 
     options = None
     service = None
     driver_class = None
+    use_safari_user_agent = False
 
     try:
-        if browser.lower() == "chrome":
+        # Check if we're on macOS and Safari is requested
+        is_macos = platform.system().lower() == "darwin"
+        if browser.lower() == "safari":
+            if is_macos:
+                options = SafariOptions()
+                driver_class = webdriver.Safari
+                logger.info("Initializing Safari driver on macOS...")
+            else:
+                logger.warning("Safari is not supported on non-macOS systems. Falling back to Chrome with Safari user-agent.")
+                options = ChromeOptions()
+                chromedriver_path = ChromeDriverManager().install()
+                subprocess.run(["chmod", "+x", chromedriver_path], check=True)
+                service = ChromeService(chromedriver_path)
+                driver_class = webdriver.Chrome
+                use_safari_user_agent = True  # Use Safari user-agent with Chrome
+                logger.info("Initializing Chrome driver with Safari user-agent...")
+        else:
+            # Default to Chrome
             options = ChromeOptions()
             chromedriver_path = ChromeDriverManager().install()
             subprocess.run(["chmod", "+x", chromedriver_path], check=True)
@@ -65,44 +86,15 @@ def fetch_html(browser="chrome"):
             driver_class = webdriver.Chrome
             logger.info("Initializing Chrome driver...")
 
-        elif browser.lower() == "edge":
-            options = EdgeOptions()
-            chromedriver_path = EdgeChromiumDriverManager().install()
-            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
-            service = EdgeService(chromedriver_path)
-            driver_class = webdriver.Edge
-            logger.info("Initializing Edge driver...")
-
-        elif browser.lower() == "firefox":
-            options = FirefoxOptions()
-            geckodriver_path = GeckoDriverManager().install()
-            subprocess.run(["chmod", "+x", geckodriver_path], check=True)
-            service = FirefoxService(geckodriver_path)
-            driver_class = webdriver.Firefox
-            logger.info("Initializing Firefox driver...")
-
-        elif browser.lower() == "opera":
-            logger.warning("Opera not directly supported, using Chrome settings instead.")
-            options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager().install()
-            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
-            service = ChromeService(chromedriver_path)
-            driver_class = webdriver.Chrome
-
-        else:
-            logger.warning(f"Unsupported browser '{browser}', defaulting to Chrome.")
-            options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager().install()
-            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
-            service = ChromeService(chromedriver_path)
-            driver_class = webdriver.Chrome
-
-        # Apply common options after initializing options
-        for arg in common_options:
-            options.add_argument(arg)
+        # Apply Chrome options if using Chrome
+        if isinstance(options, ChromeOptions):
+            for arg in chrome_options:
+                options.add_argument(arg)
+            if use_safari_user_agent:
+                options.add_argument(f"--user-agent={safari_user_agent}")
 
         # Initialize the driver
-        driver = driver_class(service=service, options=options)
+        driver = driver_class(service=service, options=options) if service else driver_class(options=options)
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
     except Exception as e:
