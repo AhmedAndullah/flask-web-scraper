@@ -21,7 +21,7 @@ import subprocess
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fetch_html(browser="chrome"):  # Default to Chrome
+def fetch_html(browser="chrome"):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
@@ -44,7 +44,7 @@ def fetch_html(browser="chrome"):  # Default to Chrome
     try:
         if browser.lower() == "chrome":
             options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager(version="latest").install()
+            chromedriver_path = ChromeDriverManager().install()  # Remove version parameter
             # Ensure chromedriver is executable
             subprocess.run(["chmod", "+x", chromedriver_path], check=True)
             service = ChromeService(chromedriver_path)
@@ -70,7 +70,7 @@ def fetch_html(browser="chrome"):  # Default to Chrome
         elif browser.lower() == "opera":
             logger.warning("Opera not directly supported, using Chrome settings instead.")
             options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager(version="latest").install()
+            chromedriver_path = ChromeDriverManager().install()  # Remove version parameter
             subprocess.run(["chmod", "+x", chromedriver_path], check=True)
             service = ChromeService(chromedriver_path)
             driver_class = webdriver.Chrome
@@ -78,7 +78,7 @@ def fetch_html(browser="chrome"):  # Default to Chrome
         else:
             logger.warning(f"Unsupported browser '{browser}', defaulting to Chrome.")
             options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager(version="latest").install()
+            chromedriver_path = ChromeDriverManager().install()  # Remove version parameter
             subprocess.run(["chmod", "+x", chromedriver_path], check=True)
             service = ChromeService(chromedriver_path)
             driver_class = webdriver.Chrome
