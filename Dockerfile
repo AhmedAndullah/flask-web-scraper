@@ -41,5 +41,5 @@ COPY . .
 # Expose the port
 EXPOSE 8080
 
-# Run the app with Gunicorn (single worker, single thread, increased timeout)
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "1", "--timeout", "300", "--log-level", "info", "--preload"]
+# Run the app with Gunicorn (single worker, increased timeout)
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "300", "--log-level", "info", "--preload"]
