@@ -4,12 +4,15 @@ from flask_caching import Cache
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
+import json
 
 app = Flask(__name__)
 cache = Cache(app, config={"CACHE_TYPE": "simple"})
 
 # Initialize Firebase
-cred = credentials.Certificate('serviceAccountKey.json')
+firebase_credentials = json.loads(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
+
+cred = credentials.Certificate(firebase_credentials)
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
