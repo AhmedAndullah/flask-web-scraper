@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IVENÄ Clone</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/leitstellenansicht4.3.0.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/design4.3.0.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared_v4.3.0.css') }}">
+    
+    <style>
+        .emergency-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background-color: #ff4444;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .emergency-btn:hover {
+            background-color: #cc0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="{{ url_for('static', filename='images/logo_ivena_klein.png') }}" alt="IVENÄ Logo" class="logo">
+        <h1>IVENÄ eHealth - Interdisziplinärer Versorgungsnachweis</h1>
+        <a href="/emergency-contact" class="emergency-btn">Notfall-Kontakt</a>
+    </div>
+
+    <div id="web-content">
+        {{ html_content | safe }}
+    </div>
+
+    <script defer src="{{ url_for('static', filename='js/jquery-1.12.4.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/jquery-ui-1.12.1.min.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/mainisjs-v100.js') }}"></script>
+
+    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'91d3fdf02a417bcf',t:'MTc0MTQ1NDMwNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html>

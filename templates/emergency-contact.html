@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notfallkontakt - IVENÄ</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f7fa;
+        color: #2c3e50;
+        line-height: 1.6;
+        padding: 30px 15px;
+      }
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+      }
+      h2 {
+        font-size: 28px;
+        color: #2c3e50;
+        border-bottom: 3px solid #3498db;
+        padding-bottom: 10px;
+        margin-bottom: 25px;
+      }
+      h3 {
+        font-size: 20px;
+        color: #34495e;
+        margin-bottom: 15px;
+      }
+      .current-contact {
+        background: linear-gradient(135deg, #f8fafc, #e9ecef);
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #e0e6ed;
+        margin-bottom: 30px;
+      }
+      .current-contact:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+      }
+      .current-contact h3::before {
+        content: "📞";
+        font-size: 24px;
+      }
+      #currentContacts {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      .contact-card {
+        background: #ffffff;
+        padding: 15px;
+        border-radius: 6px;
+        border-left: 4px solid #3498db;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      }
+      .contact-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+      .contact-card p {
+        font-size: 16px;
+        margin: 5px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .contact-card p::before {
+        font-size: 18px;
+      }
+      .contact-card p.phone::before {
+        content: "📱";
+      }
+      .contact-card p.name::before {
+        content: "👤";
+      }
+      .contact-card p.name strong {
+        font-weight: 600;
+        color: #2c3e50;
+      }
+      .form-section {
+        margin-top: 20px;
+        padding: 20px;
+        background: #f9fbfc;
+        border-radius: 8px;
+        border: 1px solid #e0e6ed;
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #34495e;
+        margin-bottom: 8px;
+      }
+      input[type="text"],
+      input[type="tel"] {
+        width: 100%;
+        padding: 10px;
+        font-size: 14px;
+        border: 1px solid #d1d9e0;
+        border-radius: 6px;
+      }
+      input[type="text"]:focus,
+      input[type="tel"]:focus {
+        border-color: #3498db;
+        outline: none;
+      }
+      textarea {
+        width: 100%;
+        padding: 10px;
+        font-size: 14px;
+        border: 1px solid #d1d9e0;
+        border-radius: 6px;
+        resize: vertical;
+        min-height: 80px;
+      }
+      textarea:focus {
+        border-color: #3498db;
+        outline: none;
+      }
+      .days-checkboxes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+      }
+      .day-label {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 14px;
+        color: #34495e;
+      }
+      button {
+        background-color: #3498db;
+        color: #ffffff;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #2980b9;
+        transform: translateY(-1px);
+      }
+      button:active {
+        transform: translateY(0);
+      }
+      #contactList,
+      #notesList {
+        margin-top: 30px;
+      }
+      .list-entry {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        border-bottom: 1px solid #e0e6ed;
+      }
+      .list-entry:hover {
+        background-color: #f8fafc;
+      }
+      .list-entry:last-child {
+        border-bottom: none;
+      }
+      .entry-details {
+        flex: 1;
+      }
+      .entry-details strong {
+        font-size: 16px;
+        color: #2c3e50;
+      }
+      .entry-details p {
+        font-size: 14px;
+        color: #7f8c8d;
+        margin: 3px 0;
+      }
+      .delete-btn {
+        background-color: #e74c3c;
+        padding: 8px 16px;
+        font-size: 13px;
+      }
+      .delete-btn:hover {
+        background-color: #c0392b;
+      }
+      @media (max-width: 600px) {
+        .container {
+          padding: 20px;
+        }
+        h2 {
+          font-size: 24px;
+        }
+        h3 {
+          font-size: 18px;
+        }
+        .days-checkboxes {
+          gap: 10px;
+        }
+        button {
+          width: 100%;
+        }
+        .list-entry {
+          flex-direction: column;
+          gap: 10px;
+        }
+        .delete-btn {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Notfallkontakte</h2>
+
+      <div class="current-contact">
+        <h3>Heutige Notfallkontakte</h3>
+        <div id="currentContacts"></div>
+      </div>
+
+      <div class="form-section">
+        <h3>Neuen Notfallkontakt hinzufügen</h3>
+        <div class="form-group">
+          <label for="name">Name:</label>
+          <input type="text" id="name" placeholder="Name eingeben" />
+        </div>
+        <div class="form-group">
+          <label for="phone">Telefonnummer:</label>
+          <input type="tel" id="phone" placeholder="Telefonnummer eingeben" />
+        </div>
+        <div class="form-group">
+          <label>Aktive Tage:</label>
+          <div class="days-checkboxes">
+            <label class="day-label"
+              ><input type="checkbox" value="1" /> Montag</label
+            >
+            <label class="day-label"
+              ><input type="checkbox" value="2" /> Dienstag</label
+            >
+            <label class="day-label"
+              ><input type="checkbox" value="3" /> Mittwoch</label
+            >
+            <label class="day-label"
+              ><input type="checkbox" value="4" /> Donnerstag</label
+            >
+            <label class="day-label"
+              ><input type="checkbox" value="5" /> Freitag</label
+            >
+            <label class="day-label"
+              ><input type="checkbox" value="6" /> Samstag</label
+            >
+            <label class="day-label"
+              ><input type="checkbox" value="0" /> Sonntag</label
+            >
+          </div>
+        </div>
+        <button onclick="addContact()">Kontakt hinzufügen</button>
+      </div>
+
+      <div id="contactList"></div>
+
+      <div class="form-section">
+        <h3>Notizen hinzufügen</h3>
+        <div class="form-group">
+          <label for="newNote">Notiz:</label>
+          <textarea id="newNote" placeholder="Notiz eingeben"></textarea>
+        </div>
+        <button onclick="addNote()">Notiz speichern</button>
+      </div>
+
+      <div id="notesList"></div>
+    </div>
+
+    <script>
+      const days = [
+        "Sonntag",
+        "Montag",
+        "Dienstag",
+        "Mittwoch",
+        "Donnerstag",
+        "Freitag",
+        "Samstag",
+      ];
+
+      async function fetchContacts() {
+        const response = await fetch("/get-contacts");
+        return await response.json();
+      }
+
+      async function fetchNotes() {
+        const response = await fetch("/get-notes");
+        return await response.json();
+      }
+
+      async function updateCurrentContact(contacts) {
+        const today = new Date().getDay();
+        const todayContacts = contacts.filter((contact) =>
+          contact.days.includes(today.toString())
+        );
+        const contactsContainer = document.getElementById("currentContacts");
+        contactsContainer.innerHTML = "";
+        if (todayContacts.length > 0) {
+          todayContacts.forEach((contact) => {
+            const contactDiv = document.createElement("div");
+            contactDiv.className = "contact-card";
+            contactDiv.innerHTML = `
+                        <p class="phone">Telefon: ${contact.phone}</p>
+                        <p class="name">Kontakt: <strong>${contact.name}</strong></p>
+                    `;
+            contactsContainer.appendChild(contactDiv);
+          });
+        } else {
+          contactsContainer.innerHTML =
+            "<p>Kein Notfallkontakt für heute zugewiesen</p>";
+        }
+      }
+
+      async function addContact() {
+        const name = document.getElementById("name").value;
+        const phone = document.getElementById("phone").value;
+        const checkboxes = document.querySelectorAll(
+          ".days-checkboxes input:checked"
+        );
+        const selectedDays = Array.from(checkboxes).map((cb) => cb.value);
+
+        if (!name || !phone || selectedDays.length === 0) {
+          alert(
+            "Bitte füllen Sie Name, Telefonnummer und wählen Sie mindestens einen Tag aus"
+          );
+          return;
+        }
+
+        const newContact = { name, phone, days: selectedDays };
+        await fetch("/add-contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newContact),
+        });
+
+        document.getElementById("name").value = "";
+        document.getElementById("phone").value = "";
+        checkboxes.forEach((cb) => (cb.checked = false));
+        initializePage();
+      }
+
+      async function addNote() {
+        const noteText = document.getElementById("newNote").value;
+        if (!noteText) {
+          alert("Bitte geben Sie eine Notiz ein");
+          return;
+        }
+
+        await fetch("/save-notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes: noteText }),
+        });
+
+        document.getElementById("newNote").value = "";
+        initializePage();
+      }
+      async function deleteContact(index) {
+        const response = await fetch(`/delete-contact/${index}`, {
+          method: "DELETE",
+        });
+        const result = await response.json();
+        if (result.status === "success") {
+          initializePage();
+        } else {
+          alert("Fehler beim Löschen des Kontakts: " + result.message);
+        }
+      }
+
+      async function deleteNote(noteId) {
+        const response = await fetch(`/delete-note/${noteId}`, {
+          method: "DELETE",
+        });
+        const result = await response.json();
+        if (result.status === "success") {
+          initializePage();
+        } else {
+          alert("Fehler beim Löschen der Notiz");
+        }
+      }
+      async function displayContacts(contacts) {
+        const list = document.getElementById("contactList");
+        list.innerHTML = "<h3>Gespeicherte Kontakte</h3>";
+        if (contacts.length === 0) {
+          list.innerHTML += "<p>Noch keine gespeicherten Kontakte.</p>";
+          return;
+        }
+        contacts.forEach((contact, index) => {
+          const daysText = contact.days.map((day) => days[day]).join(", ");
+          const entry = document.createElement("div");
+          entry.className = "list-entry";
+          entry.innerHTML = `
+                    <div class="entry-details">
+                        <strong>${contact.name}</strong>
+                        <p>Telefon: ${contact.phone}</p>
+                        <p>Aktiv an: ${daysText}</p>
+                    </div>
+                    <button class="delete-btn" onclick="deleteContact(${index})">Löschen</button>
+                `;
+          list.appendChild(entry);
+        });
+      }
+
+      async function displayNotes(notes) {
+        const list = document.getElementById("notesList");
+        list.innerHTML = "<h3>Gespeicherte Notizen</h3>";
+        if (notes.length === 0) {
+          list.innerHTML += "<p>Noch keine gespeicherten Notizen.</p>";
+          return;
+        }
+        notes.forEach((note) => {
+          const entry = document.createElement("div");
+          entry.className = "list-entry";
+          entry.innerHTML = `
+            <div class="entry-details">
+                <p>${note.notes}</p>
+            </div>
+            <button class="delete-btn" onclick="deleteNote('${note.id}')">Löschen</button>
+        `;
+          list.appendChild(entry);
+        });
+      }
+
+      async function initializePage() {
+        const contacts = await fetchContacts();
+        const notes = await fetchNotes();
+        await updateCurrentContact(contacts);
+        await displayContacts(contacts);
+        await displayNotes(notes);
+      }
+
+      initializePage();
+    </script>
+  </body>
+</html>
