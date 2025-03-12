@@ -11,7 +11,7 @@ import logging
 import time
 import glob
 import tempfile
-from selenium.common.exceptions import WebDriverException, TimeoutException
+from selenium.common.exceptions import WebDriverException, TimeoutException, InvalidSessionIdException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -67,7 +67,7 @@ def get_chromedriver_path(max_retries=3):
 
     raise FileNotFoundError(f"ChromeDriver binary not found after {max_retries} attempts in {base_dir}")
 
-def fetch_html(browser="chrome", retries=2):
+def fetch_html(browser="chrome", retries=3):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
@@ -78,34 +78,35 @@ def fetch_html(browser="chrome", retries=2):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=400,300")  # Reduced window size to save memory
-    chrome_options.add_argument("--no-first-run")  # Prevent first-run dialog
-    chrome_options.add_argument("--disable-extensions")  # Disable extensions to reduce overhead
-    chrome_options.add_argument("--disable-default-apps")  # Disable default apps
-    # Memory optimization options
+    chrome_options.add_argument("--window-size=300,200")  # Further reduced window size
+    chrome_options.add_argument("--no-first-run")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-default-apps")
     chrome_options.add_argument("--disable-background-networking")
     chrome_options.add_argument("--disable-sync")
     chrome_options.add_argument("--disable-translate")
     chrome_options.add_argument("--disable-background-timer-throttling")
     chrome_options.add_argument("--disable-client-side-phishing-detection")
     chrome_options.add_argument("--disable-hang-monitor")
-    chrome_options.add_argument("--single-process")  # Run Chrome in a single process to reduce memory
-    chrome_options.add_argument("--disable-dev-tools")  # Disable developer tools
-    chrome_options.add_argument("--disable-logging")  # Reduce logging overhead
+    chrome_options.add_argument("--single-process")
+    chrome_options.add_argument("--disable-dev-tools")
+    chrome_options.add_argument("--disable-logging")
+    chrome_options.add_argument("--mute-audio")  # Disable audio to save resources
 
     # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
     logger.info(f"Using user data directory: {user_data_dir}")
     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
+    driver = None
     try:
         chromedriver_path = get_chromedriver_path()
-        logger.info(f"ChromeDriver path passed to service: {chromedriver_path}")  # Debug the exact path
-        service = ChromeService(executable_path=chromedriver_path)  # Explicitly pass the executable path
+        logger.info(f"ChromeDriver path passed to service: {chromedriver_path}")
+        service = ChromeService(executable_path=chromedriver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        # Set a page load timeout to prevent excessive resource usage
-        driver.set_page_load_timeout(30)  # Reduced to 30 seconds
+        # Set a page load timeout
+        driver.set_page_load_timeout(25)  # Reduced to 25 seconds
 
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
@@ -120,11 +121,19 @@ def fetch_html(browser="chrome", retries=2):
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
                 break
-            except TimeoutException as e:
-                logger.warning(f"Timeout loading URL on attempt {attempt + 1}: {e}")
-                if attempt == retries - 1:
-                    raise WebDriverException("Failed to load URL after all retries due to timeout")
-                time.sleep(1)
+            except (TimeoutException, InvalidSessionIdException) as e:
+                logger.warning(f"Error loading URL on attempt {attempt + 1}: {e}")
+                if attempt < retries - 1:
+                    # Reinitialize driver on session invalidation
+                    if driver:
+                        driver.quit()
+                    user_data_dir = tempfile.mkdtemp()
+                    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                    driver.set_page_load_timeout(25)
+                    time.sleep(1)  # Wait before retrying
+                else:
+                    raise WebDriverException("Failed to load URL after all retries")
             except WebDriverException as e:
                 logger.warning(f"Failed to load URL on attempt {attempt + 1}: {e}")
                 if attempt == retries - 1:
@@ -169,7 +178,8 @@ def fetch_html(browser="chrome", retries=2):
         modified_html = "<h1>Error: Could not load content. Please try again later.</h1>"
 
     finally:
-        driver.quit()
+        if driver:
+            driver.quit()
         # Clean up the user data directory
         if os.path.exists(user_data_dir):
             import shutil
