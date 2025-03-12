@@ -22,8 +22,8 @@ def fetch_html(browser="chromium", retries=3):
     for attempt in range(retries):
         try:
             with sync_playwright() as p:
-                # Map browser argument to Playwright browser types
-                browser_type = p.chromium if browser == "chromium" else p.firefox if browser == "firefox" else p.webkit
+                # Map browser argument to Playwright browser types, default to webkit for lower memory
+                browser_type = p.webkit if browser == "webkit" else p.chromium if browser == "chromium" else p.firefox
                 browser = browser_type.launch(
                     headless=True,
                     args=[
@@ -32,8 +32,9 @@ def fetch_html(browser="chromium", retries=3):
                         "--disable-gpu",
                         "--disable-extensions",
                         "--disable-sync",
-                        "--disable-setuid-sandbox",  # Additional memory optimization
-                        "--window-size=250,150"
+                        "--disable-setuid-sandbox",  # Memory optimization
+                        "--single-process",  # Reduce memory by running in a single process
+                        "--window-size=1280,720"  # Standard size to avoid rendering quirks
                     ]
                 )
                 page = browser.new_page()
@@ -44,6 +45,9 @@ def fetch_html(browser="chromium", retries=3):
                 # Navigate to the URL with increased timeout and adjusted wait condition
                 page.goto(url, wait_until="load", timeout=60000)  # 60-second timeout, wait for load event
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
+
+                # Take an early screenshot for debugging
+                page.screenshot(path=f"debug_attempt_{attempt}.png")
 
                 # Wait for and click region
                 page.wait_for_selector("#anonymous_oe", state="attached", timeout=10000)  # Wait for presence
@@ -63,9 +67,9 @@ def fetch_html(browser="chromium", retries=3):
                 department_link.click()
                 logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
 
-                # Get the final HTML content and take a screenshot for debugging
+                # Get the final HTML content and take another screenshot
                 html_content = page.content()
-                page.screenshot(path="debug.png")  # Save screenshot for debugging
+                page.screenshot(path=f"debug_final_{attempt}.png")  # Final screenshot
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
 
                 # Close the browser within the with block
@@ -106,7 +110,7 @@ def fetch_html(browser="chromium", retries=3):
     return modified_html
 
 if __name__ == "__main__":
-    browser = os.getenv("BROWSER", "chromium")
+    browser = os.getenv("BROWSER", "webkit")  # Default to webkit for lower memory
     logger.info(f"Using browser: {browser}")
     html_content = fetch_html(browser)
     with open("output.html", "w", encoding="utf-8") as f:
