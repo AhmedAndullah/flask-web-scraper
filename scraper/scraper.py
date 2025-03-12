@@ -21,8 +21,9 @@ def get_chromedriver_path(max_retries=3):
     """Find the correct ChromeDriver binary inside the webdriver-manager cache with retries."""
     for attempt in range(max_retries):
         try:
-            # Force a specific stable version to avoid potential bugs in the latest
-            base_dir = ChromeDriverManager(version="133.0.6996.0").install()
+            # Attempt to use a specific stable version
+            manager = ChromeDriverManager(driver_version="133.0.6996.0", cache_valid_range=1)
+            base_dir = manager.install()
             logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial ChromeDriver base directory: {base_dir}")
 
             # Ensure we are working with the correct directory (parent of any file)
@@ -63,9 +64,25 @@ def get_chromedriver_path(max_retries=3):
             if attempt < max_retries - 1:
                 time.sleep(1)
             else:
-                raise
+                # Fallback to latest version if specific version fails
+                try:
+                    manager = ChromeDriverManager(cache_valid_range=1)
+                    base_dir = manager.install()
+                    logger.info(f"Fallback: Initial ChromeDriver base directory: {base_dir}")
+                    if os.path.isfile(base_dir):
+                        base_dir = os.path.dirname(base_dir)
+                    possible_binaries = glob.glob(os.path.join(base_dir, "**", "chromedriver"), recursive=True)
+                    if possible_binaries:
+                        chromedriver_path = possible_binaries[0]
+                        logger.info(f"Fallback: Using ChromeDriver from: {chromedriver_path}")
+                        return chromedriver_path
+                    else:
+                        raise FileNotFoundError("No ChromeDriver binary found in fallback attempt")
+                except Exception as fallback_e:
+                    logger.error(f"Fallback failed: {fallback_e}")
+                    raise
 
-    raise FileNotFoundError(f"ChromeDriver binary not found after {max_retries} attempts in {base_dir}")
+    raise FileNotFoundError(f"ChromeDriver binary not found after {max_retries} attempts")
 
 def fetch_html(browser="chrome", retries=3):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
@@ -78,7 +95,7 @@ def fetch_html(browser="chrome", retries=3):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=250,150")  # Even smaller window size
+    chrome_options.add_argument("--window-size=250,150")
     chrome_options.add_argument("--no-first-run")
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-default-apps")
@@ -92,9 +109,9 @@ def fetch_html(browser="chrome", retries=3):
     chrome_options.add_argument("--disable-dev-tools")
     chrome_options.add_argument("--disable-logging")
     chrome_options.add_argument("--mute-audio")
-    chrome_options.add_argument("--disable-notifications")  # Disable notifications
-    chrome_options.add_argument("--incognito")  # Use incognito mode to reduce profile overhead
-    chrome_options.add_argument("--remote-debugging-port=0")  # Disable remote debugging
+    chrome_options.add_argument("--disable-notifications")
+    chrome_options.add_argument("--incognito")
+    chrome_options.add_argument("--remote-debugging-port=0")
 
     # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
@@ -109,7 +126,7 @@ def fetch_html(browser="chrome", retries=3):
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
         # Set a page load timeout
-        driver.set_page_load_timeout(20)  # Reduced to 20 seconds
+        driver.set_page_load_timeout(20)
 
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
@@ -134,7 +151,7 @@ def fetch_html(browser="chrome", retries=3):
                     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
                     driver = webdriver.Chrome(service=service, options=chrome_options)
                     driver.set_page_load_timeout(20)
-                    time.sleep(2)  # Increased delay before retrying
+                    time.sleep(2)
                 else:
                     raise WebDriverException("Failed to load URL after all retries")
             except WebDriverException as e:
