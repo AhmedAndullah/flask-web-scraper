@@ -27,7 +27,7 @@ def fetch_html(use_selenium=True, retries=3):
 
     html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
     
-    # Hardcoded list of proxies (replace with working proxies from free-proxy-list.net)
+    # Hardcoded list of proxies (replace with working proxies or use a paid service)
     proxies = [
         "3.127.62.252:80",  # Working proxy from logs
         "188.68.52.244:80",  # Test with new proxies
@@ -48,7 +48,7 @@ def fetch_html(use_selenium=True, retries=3):
             try:
                 logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries}, proxy: {proxy})...")
                 proxies_dict = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
-                response = requests.get(url, timeout=60, proxies=proxies_dict, headers=headers, verify=False)  # Disable SSL verification
+                response = requests.get(url, timeout=60, proxies=proxies_dict, headers=headers, verify=False)
                 response.raise_for_status()
                 html_content = response.text
                 logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
@@ -65,7 +65,7 @@ def fetch_html(use_selenium=True, retries=3):
         if html_content != "<h1>Error: Could not load content. Please try again later.</h1>" and "Error: Could not load content" not in html_content:
             break
 
-    # Use Selenium regardless of requests success if enabled, to handle dynamic content
+    # Use Selenium regardless of requests success if enabled, to handle dynamic content and Cloudflare
     if use_selenium:
         # First try with proxy
         firefox_options = Options()
@@ -99,8 +99,54 @@ def fetch_html(use_selenium=True, retries=3):
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
+                # Wait for Cloudflare iframe or challenge (approximate)
+                try:
+                    WebDriverWait(driver, 20).until(
+                        EC.presence_of_element_located((By.TAG_NAME, "iframe"))
+                    )
+                    logger.info(f"Cloudflare iframe detected in {time.time() - start_time:.2f} seconds")
+                    # Note: Automating Cloudflare challenges in headless mode is difficult; manual intervention or paid proxy may be needed
+                except Exception as e:
+                    logger.warning(f"No Cloudflare iframe found or timed out: {e}")
+
+                # Wait for body to ensure page loads
+                WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
+                )
+                logger.info(f"Body element loaded in {time.time() - start_time:.2f} seconds")
+
+                # Reintroduce clicks to navigate past error page
+                try:
+                    region_select = WebDriverWait(driver, 20).until(
+                        EC.presence_of_element_located((By.ID, "anonymous_oe"))
+                    )
+                    region_select.click()
+                    logger.info(f"Region selected in {time.time() - start_time:.2f} seconds")
+
+                    subject_area_link = WebDriverWait(driver, 20).until(
+                        EC.element_to_be_clickable((By.LINK_TEXT, "Innere Medizin"))
+                    )
+                    subject_area_link.click()
+                    logger.info(f"Subject area clicked in {time.time() - start_time:.2f} seconds")
+
+                    department_link = WebDriverWait(driver, 20).until(
+                        EC.element_to_be_clickable((By.LINK_TEXT, "Allgemeine Innere Medizin"))
+                    )
+                    department_link.click()
+                    logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
+                except Exception as e:
+                    logger.error(f"Error during Selenium interactions: {e}")
+
+                # Wait for web-content div to load
+                WebDriverWait(driver, 20).until(
+                    EC.presence_of_element_located((By.ID, "web-content"))
+                )
+                logger.info(f"Web content loaded in {time.time() - start_time:.2f} seconds")
+
                 html_content = driver.page_source
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
+                logger.info(f"Full HTML content: {html_content[:500]}...")  # Log first 500 chars
+
                 driver.quit()
                 break
 
@@ -111,7 +157,7 @@ def fetch_html(use_selenium=True, retries=3):
                 if driver:
                     driver.quit()
 
-        # If Selenium with proxy fails, try without proxy as a last resort
+        # If Selenium with proxy fails or returns error page, try without proxy
         if "Error: Could not load content" in html_content:
             logger.info("Selenium with proxy failed or returned error page, attempting without proxy...")
             firefox_options = Options()
@@ -133,8 +179,44 @@ def fetch_html(use_selenium=True, retries=3):
                     driver.get(url)
                     logger.info(f"URL loaded (no proxy) in {time.time() - start_time:.2f} seconds")
 
+                    # Wait for body
+                    WebDriverWait(driver, 20).until(
+                        EC.presence_of_element_located((By.TAG_NAME, "body"))
+                    )
+                    logger.info(f"Body element loaded (no proxy) in {time.time() - start_time:.2f} seconds")
+
+                    # Reintroduce clicks
+                    try:
+                        region_select = WebDriverWait(driver, 20).until(
+                            EC.presence_of_element_located((By.ID, "anonymous_oe"))
+                        )
+                        region_select.click()
+                        logger.info(f"Region selected (no proxy) in {time.time() - start_time:.2f} seconds")
+
+                        subject_area_link = WebDriverWait(driver, 20).until(
+                            EC.element_to_be_clickable((By.LINK_TEXT, "Innere Medizin"))
+                        )
+                        subject_area_link.click()
+                        logger.info(f"Subject area clicked (no proxy) in {time.time() - start_time:.2f} seconds")
+
+                        department_link = WebDriverWait(driver, 20).until(
+                            EC.element_to_be_clickable((By.LINK_TEXT, "Allgemeine Innere Medizin"))
+                        )
+                        department_link.click()
+                        logger.info(f"Department clicked (no proxy) in {time.time() - start_time:.2f} seconds")
+                    except Exception as e:
+                        logger.error(f"Error during Selenium interactions (no proxy): {e}")
+
+                    # Wait for web-content
+                    WebDriverWait(driver, 20).until(
+                        EC.presence_of_element_located((By.ID, "web-content"))
+                    )
+                    logger.info(f"Web content loaded (no proxy) in {time.time() - start_time:.2f} seconds")
+
                     html_content = driver.page_source
                     logger.info(f"HTML retrieved (no proxy) in {time.time() - start_time:.2f} seconds")
+                    logger.info(f"Full HTML content (no proxy): {html_content[:500]}...")
+
                     driver.quit()
                     break
 
