@@ -9,6 +9,8 @@ import os
 import logging
 import time
 import tempfile
+from selenium.webdriver.firefox.service import Service  # Import Service
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +37,7 @@ def fetch_html(use_selenium=True, retries=3):
             try:
                 driver = webdriver.Firefox(
                     options=firefox_options,
-                    service_log_path=os.path.devnull  # Suppress logs
+                    service=Service()  # Correct way to initialize Firefox in newer Selenium versions
                 )
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
