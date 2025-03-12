@@ -13,6 +13,8 @@ import subprocess
 import time
 import platform
 from selenium.common.exceptions import WebDriverException
+import shutil
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -67,7 +69,19 @@ def fetch_html(browser="chrome", retries=2):
 # In the standard Chrome block:
         else:
             options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager().install()  # No version argument
+            chromedriver_path = ChromeDriverManager().install()
+
+            # Ensure we are selecting the correct ChromeDriver binary
+            if os.path.isdir(chromedriver_path):  # Check if the path is a directory
+                for root, dirs, files in os.walk(chromedriver_path):
+                    for file in files:
+                        if "chromedriver" in file and not file.endswith(".txt"):  # Ensure it's not a notice file
+                            chromedriver_path = os.path.join(root, file)
+                            break
+
+            # Make sure the file is executable
+            shutil.chmod(chromedriver_path, 0o755)
+
             service = ChromeService(chromedriver_path)
 
             driver_class = webdriver.Chrome
