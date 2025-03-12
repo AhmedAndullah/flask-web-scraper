@@ -273,7 +273,7 @@ def fetch_html(use_selenium=True, retries=3):
         elif tag['src'].startswith('/layout/js/'):
             tag['src'] = tag['src'].replace('/layout/js/', '/static/js/')
     for tag in soup.find_all(href=True):
-        if tag['href'].starts with('/layout/themes/standard/'):
+        if tag['href'].startswith('/layout/themes/standard/'):
             tag['href'] = tag['href'].replace('/layout/themes/standard/', '/static/css/')
 
     modified_html = str(soup)
@@ -288,7 +288,7 @@ def fetch_html(use_selenium=True, retries=3):
     return modified_html
 
 if __name__ == "__main__":
-    use_selenium = os.getenv("USE_SELENIUM", "true" ).lower() == "true"
+    use_selenium = os.getenv("USE_SELENIUM", "true").lower() == "true"
     logger.info(f"Using Selenium: {use_selenium}")
     html_content = fetch_html(use_selenium=use_selenium)
     with open("output.html", "w", encoding="utf-8") as f:
