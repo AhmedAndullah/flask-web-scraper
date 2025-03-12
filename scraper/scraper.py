@@ -21,10 +21,11 @@ def get_chromedriver_path(max_retries=3):
     """Find the correct ChromeDriver binary inside the webdriver-manager cache with retries."""
     for attempt in range(max_retries):
         try:
-            # Attempt to use a specific stable version
-            manager = ChromeDriverManager(driver_version="133.0.6996.0")
+            # Use ChromeDriver version matching installed Chrome (134.0.6998.88)
+            manager = ChromeDriverManager(driver_version="134.0.6998.88")
             base_dir = manager.install()
             logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial ChromeDriver base directory: {base_dir}")
+            # ... (rest of the function remains the same)
 
             # Ensure we are working with the correct directory (parent of any file)
             if os.path.isfile(base_dir):
