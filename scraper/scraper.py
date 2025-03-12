@@ -20,12 +20,11 @@ def fetch_html(browser="chromium", retries=3):
 
     html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
     for attempt in range(retries):
-        browser_instance = None  # Track browser instance for cleanup
         try:
             with sync_playwright() as p:
                 # Map browser argument to Playwright browser types
                 browser_type = p.chromium if browser == "chromium" else p.firefox if browser == "firefox" else p.webkit
-                browser_instance = browser_type.launch(
+                browser = browser_type.launch(
                     headless=True,
                     args=[
                         "--no-sandbox",
@@ -33,16 +32,17 @@ def fetch_html(browser="chromium", retries=3):
                         "--disable-gpu",
                         "--disable-extensions",
                         "--disable-sync",
+                        "--disable-setuid-sandbox",  # Additional memory optimization
                         "--window-size=250,150"
                     ]
                 )
-                page = browser_instance.new_page()
+                page = browser.new_page()
 
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
 
-                # Navigate to the URL and wait for the page to be fully loaded
-                page.goto(url, wait_until="networkidle", timeout=20000)  # 20-second timeout
+                # Navigate to the URL with increased timeout and adjusted wait condition
+                page.goto(url, wait_until="load", timeout=60000)  # 60-second timeout, wait for load event
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
                 # Wait for and click region
@@ -63,12 +63,13 @@ def fetch_html(browser="chromium", retries=3):
                 department_link.click()
                 logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
 
-                # Get the final HTML content
+                # Get the final HTML content and take a screenshot for debugging
                 html_content = page.content()
+                page.screenshot(path="debug.png")  # Save screenshot for debugging
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
 
                 # Close the browser within the with block
-                browser_instance.close()
+                browser.close()
 
         except Exception as e:
             logger.error(f"Error loading URL on attempt {attempt + 1}: {e}")
