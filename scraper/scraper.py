@@ -101,25 +101,34 @@ def fetch_html(use_selenium=True, retries=3):
 
                 # Check for Cloudflare CAPTCHA or error page
                 try:
-                    WebDriverWait(driver, 10).until(
+                    WebDriverWait(driver, 5).until(
                         EC.presence_of_element_located((By.TAG_NAME, "iframe"))
                     )
                     logger.warning("Cloudflare iframe detected; automation may fail without paid proxy")
                     html_content = driver.page_source  # Capture current state
+                    driver.quit()
                     break  # Exit if Cloudflare is detected
                 except Exception as e:
                     logger.info(f"No Cloudflare iframe or timed out: {e}")
 
                 # Wait for body to ensure page loads
-                WebDriverWait(driver, 10).until(
+                WebDriverWait(driver, 5).until(
                     EC.presence_of_element_located((By.TAG_NAME, "body"))
                 )
                 logger.info(f"Body element loaded in {time.time() - start_time:.2f} seconds")
 
+                # Check for error page content
+                body_text = driver.find_element(By.TAG_NAME, 'body').text
+                if "REMOTE_ADDR" in body_text:
+                    logger.warning("Detected error page with REMOTE_ADDR; likely blocked by anti-scraping measures")
+                    html_content = driver.page_source
+                    driver.quit()
+                    break
+
                 # Reintroduce clicks with robust selectors and fallback
                 region_selected = False
                 try:
-                    region_select = WebDriverWait(driver, 10).until(
+                    region_select = WebDriverWait(driver, 5).until(
                         EC.presence_of_element_located((By.XPATH, "//*[@id='anonymous_oe' or @name='anonymous_oe']"))
                     )
                     region_select.click()
@@ -131,7 +140,7 @@ def fetch_html(use_selenium=True, retries=3):
 
                 if region_selected:
                     try:
-                        subject_area_link = WebDriverWait(driver, 10).until(
+                        subject_area_link = WebDriverWait(driver, 5).until(
                             EC.element_to_be_clickable((By.XPATH, "//a[text()='Innere Medizin']"))
                         )
                         subject_area_link.click()
@@ -141,7 +150,7 @@ def fetch_html(use_selenium=True, retries=3):
                         logger.info("Skipping subject area click due to error")
 
                     try:
-                        department_link = WebDriverWait(driver, 10).until(
+                        department_link = WebDriverWait(driver, 5).until(
                             EC.element_to_be_clickable((By.XPATH, "//a[text()='Allgemeine Innere Medizin']"))
                         )
                         department_link.click()
@@ -150,14 +159,7 @@ def fetch_html(use_selenium=True, retries=3):
                         logger.error(f"Error finding department_link: {e}")
                         logger.info("Skipping department click due to error")
 
-                # Wait for web-content div to load
-                try:
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.ID, "web-content"))
-                    )
-                    logger.info(f"Web content loaded in {time.time() - start_time:.2f} seconds")
-                except Exception as e:
-                    logger.error(f"Error waiting for web-content: {e}")
+                # Removed wait for #web-content since it's part of the Flask template
 
                 html_content = driver.page_source
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
@@ -197,15 +199,23 @@ def fetch_html(use_selenium=True, retries=3):
                     logger.info(f"URL loaded (no proxy) in {time.time() - start_time:.2f} seconds")
 
                     # Wait for body
-                    WebDriverWait(driver, 10).until(
+                    WebDriverWait(driver, 5).until(
                         EC.presence_of_element_located((By.TAG_NAME, "body"))
                     )
                     logger.info(f"Body element loaded (no proxy) in {time.time() - start_time:.2f} seconds")
 
+                    # Check for error page content
+                    body_text = driver.find_element(By.TAG_NAME, 'body').text
+                    if "REMOTE_ADDR" in body_text:
+                        logger.warning("Detected error page with REMOTE_ADDR (no proxy); likely blocked by anti-scraping measures")
+                        html_content = driver.page_source
+                        driver.quit()
+                        break
+
                     # Reintroduce clicks
                     region_selected = False
                     try:
-                        region_select = WebDriverWait(driver, 10).until(
+                        region_select = WebDriverWait(driver, 5).until(
                             EC.presence_of_element_located((By.XPATH, "//*[@id='anonymous_oe' or @name='anonymous_oe']"))
                         )
                         region_select.click()
@@ -217,7 +227,7 @@ def fetch_html(use_selenium=True, retries=3):
 
                     if region_selected:
                         try:
-                            subject_area_link = WebDriverWait(driver, 10).until(
+                            subject_area_link = WebDriverWait(driver, 5).until(
                                 EC.element_to_be_clickable((By.XPATH, "//a[text()='Innere Medizin']"))
                             )
                             subject_area_link.click()
@@ -227,7 +237,7 @@ def fetch_html(use_selenium=True, retries=3):
                             logger.info("Skipping subject area click due to error")
 
                         try:
-                            department_link = WebDriverWait(driver, 10).until(
+                            department_link = WebDriverWait(driver, 5).until(
                                 EC.element_to_be_clickable((By.XPATH, "//a[text()='Allgemeine Innere Medizin']"))
                             )
                             department_link.click()
@@ -235,15 +245,6 @@ def fetch_html(use_selenium=True, retries=3):
                         except Exception as e:
                             logger.error(f"Error finding department_link (no proxy): {e}")
                             logger.info("Skipping department click due to error")
-
-                    # Wait for web-content
-                    try:
-                        WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.ID, "web-content"))
-                        )
-                        logger.info(f"Web content loaded (no proxy) in {time.time() - start_time:.2f} seconds")
-                    except Exception as e:
-                        logger.error(f"Error waiting for web-content (no proxy): {e}")
 
                     html_content = driver.page_source
                     logger.info(f"HTML retrieved (no proxy) in {time.time() - start_time:.2f} seconds")
