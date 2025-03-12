@@ -22,7 +22,7 @@ def get_chromedriver_path(max_retries=3):
     for attempt in range(max_retries):
         try:
             # Attempt to use a specific stable version
-            manager = ChromeDriverManager(driver_version="133.0.6996.0", cache_valid_range=1)
+            manager = ChromeDriverManager(driver_version="133.0.6996.0")
             base_dir = manager.install()
             logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial ChromeDriver base directory: {base_dir}")
 
@@ -66,7 +66,7 @@ def get_chromedriver_path(max_retries=3):
             else:
                 # Fallback to latest version if specific version fails
                 try:
-                    manager = ChromeDriverManager(cache_valid_range=1)
+                    manager = ChromeDriverManager()
                     base_dir = manager.install()
                     logger.info(f"Fallback: Initial ChromeDriver base directory: {base_dir}")
                     if os.path.isfile(base_dir):
