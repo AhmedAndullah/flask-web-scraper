@@ -16,34 +16,45 @@ from selenium.common.exceptions import WebDriverException
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_chromedriver_path():
-    """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
-    # Get the base directory from WebDriver Manager
-    base_dir = ChromeDriverManager().install()
-    logger.info(f"Initial ChromeDriver base directory: {base_dir}")
+def get_chromedriver_path(max_retries=3):
+    """Find the correct ChromeDriver binary inside the webdriver-manager cache with retries."""
+    for attempt in range(max_retries):
+        try:
+            # Get the base directory from WebDriver Manager
+            base_dir = ChromeDriverManager().install()
+            logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial ChromeDriver base directory: {base_dir}")
 
-    # Ensure we are working with the correct directory (parent of any file)
-    if os.path.isfile(base_dir):
-        base_dir = os.path.dirname(base_dir)
-    logger.info(f"Adjusted ChromeDriver base directory: {base_dir}")
+            # Ensure we are working with the correct directory (parent of any file)
+            if os.path.isfile(base_dir):
+                base_dir = os.path.dirname(base_dir)
+            logger.info(f"Attempt {attempt + 1}/{max_retries}: Adjusted ChromeDriver base directory: {base_dir}")
 
-    # Look for the chromedriver binary explicitly
-    possible_binaries = glob.glob(os.path.join(base_dir, "**", "chromedriver"), recursive=True)
-    logger.info(f"Possible binaries found: {possible_binaries}")
+            # Look for the chromedriver binary explicitly
+            possible_binaries = glob.glob(os.path.join(base_dir, "**", "chromedriver"), recursive=True)
+            logger.info(f"Attempt {attempt + 1}/{max_retries}: Possible binaries found: {possible_binaries}")
 
-    # Filter to find the actual executable
-    actual_binaries = [
-        path for path in possible_binaries
-        if os.path.isfile(path) and os.access(path, os.X_OK)  # Check if executable
-    ]
+            # Filter to find the actual executable
+            actual_binaries = [
+                path for path in possible_binaries
+                if os.path.isfile(path) and os.access(path, os.X_OK)  # Check if executable
+            ]
 
-    if not actual_binaries:
-        raise FileNotFoundError(f"ChromeDriver binary not found in {base_dir}")
+            if actual_binaries:
+                chromedriver_path = actual_binaries[0]  # Use the first valid executable found
+                os.chmod(chromedriver_path, 0o755)  # Ensure it's executable
+                logger.info(f"Attempt {attempt + 1}/{max_retries}: Using ChromeDriver from: {chromedriver_path}")
+                return chromedriver_path
+            else:
+                logger.warning(f"Attempt {attempt + 1}/{max_retries}: No executable found, retrying...")
+                time.sleep(1)  # Wait before retrying
+        except Exception as e:
+            logger.error(f"Attempt {attempt + 1}/{max_retries}: Error finding ChromeDriver: {e}")
+            if attempt < max_retries - 1:
+                time.sleep(1)
+            else:
+                raise
 
-    chromedriver_path = actual_binaries[0]  # Use the first valid executable found
-    os.chmod(chromedriver_path, 0o755)  # Ensure it's executable
-    logger.info(f"Using ChromeDriver from: {chromedriver_path}")
-    return chromedriver_path
+    raise FileNotFoundError(f"ChromeDriver binary not found after {max_retries} attempts in {base_dir}")
 
 def fetch_html(browser="chrome", retries=2):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
