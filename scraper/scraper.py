@@ -29,9 +29,9 @@ def fetch_html(use_selenium=True, retries=3):
     
     # Hardcoded list of proxies (replace with working proxies from free-proxy-list.net)
     proxies = [
-        "188.68.52.244:80",  # Replace with a working proxy (without scheme)
-        "23.88.116.40:80",   # Replace with a working proxy (without scheme)
-        "3.127.62.252:80"    # Replace with a working proxy (without scheme)
+        "3.127.62.252:80",  # Working proxy from logs
+        "188.68.52.244:80",  # Test with new proxies
+        "23.88.116.40:80"    # Test with new proxies
     ]
     logger.info(f"Using proxies: {proxies}")
 
@@ -52,17 +52,21 @@ def fetch_html(use_selenium=True, retries=3):
                 response.raise_for_status()
                 html_content = response.text
                 logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
-                break
+                # Check if content is the error page
+                if "Error: Could not load content" in html_content:
+                    logger.info("Detected error page, proceeding to Selenium...")
+                else:
+                    break
             except Exception as e:
                 logger.error(f"Error loading URL with requests (proxy: {proxy}) on attempt {attempt + 1}: {e}")
                 if attempt == retries - 1 and proxy == proxies[-1]:
                     logger.error(f"Failed to load URL with requests after all retries and proxies: {e}")
                 continue
-        if html_content != "<h1>Error: Could not load content. Please try again later.</h1>":
+        if html_content != "<h1>Error: Could not load content. Please try again later.</h1>" and "Error: Could not load content" not in html_content:
             break
 
-    # Use Selenium if requests fails or if explicitly enabled
-    if (use_selenium and html_content.startswith("<h1>Error")) or (use_selenium and not html_content):
+    # Use Selenium regardless of requests success if enabled, to handle dynamic content
+    if use_selenium:
         # First try with proxy
         firefox_options = Options()
         firefox_options.add_argument("--headless")
@@ -73,8 +77,8 @@ def fetch_html(use_selenium=True, retries=3):
         if proxy:
             proxy_obj = Proxy()
             proxy_obj.proxy_type = ProxyType.MANUAL
-            proxy_obj.http_proxy = proxy  # Scheme removed
-            proxy_obj.ssl_proxy = proxy   # Scheme removed
+            proxy_obj.http_proxy = proxy
+            proxy_obj.ssl_proxy = proxy
             firefox_options.proxy = proxy_obj
             logger.info(f"Using Selenium with proxy: {proxy}")
 
@@ -108,8 +112,8 @@ def fetch_html(use_selenium=True, retries=3):
                     driver.quit()
 
         # If Selenium with proxy fails, try without proxy as a last resort
-        if html_content.startswith("<h1>Error"):
-            logger.info("All proxies failed, attempting Selenium without proxy...")
+        if "Error: Could not load content" in html_content:
+            logger.info("Selenium with proxy failed or returned error page, attempting without proxy...")
             firefox_options = Options()
             firefox_options.add_argument("--headless")
             firefox_options.add_argument("--no-sandbox")
