@@ -4,7 +4,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.safari.options import Options as SafariOptions
 from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import os
@@ -20,13 +19,13 @@ logger = logging.getLogger(__name__)
 
 def get_chromedriver_path():
     """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
-    chromedriver_dir = ChromeDriverManager().install()  # Install and get the directory
+    chromedriver_dir = ChromeDriverManager().install()  # Install and get directory
 
-    # Search for the actual 'chromedriver' binary inside possible nested folders
-    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver*"), recursive=True)
+    # Look inside all possible folders for ChromeDriver and ignore non-binary files
+    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver"), recursive=True)
 
-    # Filter out unwanted files like 'THIRD_PARTY_NOTICES.chromedriver'
-    actual_binaries = [path for path in possible_binaries if os.path.isfile(path) and not path.endswith(".txt")]
+    # Remove unwanted files like 'THIRD_PARTY_NOTICES.chromedriver'
+    actual_binaries = [path for path in possible_binaries if os.path.isfile(path) and "chromedriver" in path and not path.endswith(".txt")]
 
     if not actual_binaries:
         raise FileNotFoundError(f"ChromeDriver binary not found in {chromedriver_dir}")
