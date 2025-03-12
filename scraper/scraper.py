@@ -9,10 +9,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import os
 import logging
-import subprocess
 import time
 import platform
-import shutil
 import glob
 from selenium.common.exceptions import WebDriverException
 
@@ -22,15 +20,18 @@ logger = logging.getLogger(__name__)
 
 def get_chromedriver_path():
     """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
-    chromedriver_dir = ChromeDriverManager().install()  # Download & get directory
+    chromedriver_dir = ChromeDriverManager().install()  # Install and get the directory
 
-    # Look inside all possible folders for ChromeDriver
-    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver"), recursive=True)
+    # Search for the actual 'chromedriver' binary inside possible nested folders
+    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver*"), recursive=True)
 
-    if not possible_binaries:
+    # Filter out unwanted files like 'THIRD_PARTY_NOTICES.chromedriver'
+    actual_binaries = [path for path in possible_binaries if os.path.isfile(path) and not path.endswith(".txt")]
+
+    if not actual_binaries:
         raise FileNotFoundError(f"ChromeDriver binary not found in {chromedriver_dir}")
 
-    chromedriver_path = possible_binaries[0]  # Select the first valid binary found
+    chromedriver_path = actual_binaries[0]  # Use the first valid binary found
     os.chmod(chromedriver_path, 0o755)  # Ensure it's executable
     logger.info(f"Using ChromeDriver from: {chromedriver_path}")
     return chromedriver_path
@@ -49,21 +50,15 @@ def fetch_html(browser="chrome", retries=2):
         "--window-size=800,600"
     ]   
 
-    options = None
-    service = None
-    driver_class = None
-
     try:
         options = ChromeOptions()
         chromedriver_path = get_chromedriver_path()
         service = ChromeService(chromedriver_path)
-        driver_class = webdriver.Chrome
-        logger.info("Initializing Chrome driver...")
+        driver = webdriver.Chrome(service=service, options=options)
 
         for arg in chrome_options:
             options.add_argument(arg)
 
-        driver = driver_class(service=service, options=options) if service else driver_class(options=options)
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
     except Exception as e:
