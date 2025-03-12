@@ -18,27 +18,29 @@ logger = logging.getLogger(__name__)
 
 def get_chromedriver_path():
     """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
-    chromedriver_dir = ChromeDriverManager().install()  # Install and get directory
-    logger.info(f"ChromeDriver directory: {chromedriver_dir}")
+    # Get the base directory from WebDriver Manager
+    base_dir = ChromeDriverManager().install()
+    logger.info(f"Initial ChromeDriver base directory: {base_dir}")
 
-    # Look for all files matching 'chromedriver' pattern
-    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver*"), recursive=True)
+    # Ensure we are working with the correct directory (parent of any file)
+    if os.path.isfile(base_dir):
+        base_dir = os.path.dirname(base_dir)
+    logger.info(f"Adjusted ChromeDriver base directory: {base_dir}")
+
+    # Look for the chromedriver binary explicitly
+    possible_binaries = glob.glob(os.path.join(base_dir, "**", "chromedriver"), recursive=True)
     logger.info(f"Possible binaries found: {possible_binaries}")
 
     # Filter to find the actual executable
     actual_binaries = [
         path for path in possible_binaries
-        if os.path.isfile(path)
-        and os.path.basename(path).lower() == "chromedriver"  # Exact match for 'chromedriver'
-        and "third_party_notices" not in os.path.basename(path).lower()
+        if os.path.isfile(path) and os.access(path, os.X_OK)  # Check if executable
     ]
 
-    logger.info(f"Filtered binaries: {actual_binaries}")
-
     if not actual_binaries:
-        raise FileNotFoundError(f"ChromeDriver binary not found in {chromedriver_dir}")
+        raise FileNotFoundError(f"ChromeDriver binary not found in {base_dir}")
 
-    chromedriver_path = actual_binaries[0]  # Use the first valid binary found
+    chromedriver_path = actual_binaries[0]  # Use the first valid executable found
     os.chmod(chromedriver_path, 0o755)  # Ensure it's executable
     logger.info(f"Using ChromeDriver from: {chromedriver_path}")
     return chromedriver_path
