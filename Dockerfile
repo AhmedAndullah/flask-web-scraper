@@ -1,7 +1,7 @@
 # Use the official Python 3.13 slim image as the base
 FROM python:3.13-slim
 
-# Install system dependencies for Chrome and ChromeDriver
+# Install system dependencies for Chrome and ChromeDriver, plus debugging tools
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     libxi6 \
     libgtk-3-0 \
+    file \
     && rm -rf /var/lib/apt/lists/*
 
 # Add Google's signing key using a modern approach

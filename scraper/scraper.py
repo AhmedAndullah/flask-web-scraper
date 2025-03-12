@@ -19,17 +19,21 @@ logger = logging.getLogger(__name__)
 def get_chromedriver_path():
     """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
     chromedriver_dir = ChromeDriverManager().install()  # Install and get directory
+    logger.info(f"ChromeDriver directory: {chromedriver_dir}")
 
-    # Look for the chromedriver binary explicitly
+    # Look for all files matching 'chromedriver' pattern
     possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver*"), recursive=True)
+    logger.info(f"Possible binaries found: {possible_binaries}")
 
-    # Filter to find the actual executable (exclude text files like THIRD_PARTY_NOTICES)
+    # Filter to find the actual executable
     actual_binaries = [
-        path for path in possible_binaries 
-        if os.path.isfile(path) 
-        and "chromedriver" in os.path.basename(path).lower() 
+        path for path in possible_binaries
+        if os.path.isfile(path)
+        and os.path.basename(path).lower() == "chromedriver"  # Exact match for 'chromedriver'
         and "third_party_notices" not in os.path.basename(path).lower()
     ]
+
+    logger.info(f"Filtered binaries: {actual_binaries}")
 
     if not actual_binaries:
         raise FileNotFoundError(f"ChromeDriver binary not found in {chromedriver_dir}")
@@ -55,8 +59,7 @@ def fetch_html(browser="chrome", retries=2):
 
     try:
         options = ChromeOptions()
-        # Specify the Chrome binary location installed in the Dockerfile
-        options.binary_location = "/usr/bin/google-chrome"
+        options.binary_location = "/usr/bin/google-chrome"  # Point to Chrome binary
         chromedriver_path = get_chromedriver_path()
         service = ChromeService(executable_path=chromedriver_path)
         driver = webdriver.Chrome(service=service, options=options)
