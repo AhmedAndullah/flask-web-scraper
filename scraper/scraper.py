@@ -12,6 +12,7 @@ import logging
 import subprocess
 import time
 import platform
+import shutil
 import glob
 from selenium.common.exceptions import WebDriverException
 
@@ -21,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 def get_chromedriver_path():
     """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
-    chromedriver_dir = ChromeDriverManager().install()  # Install and get the directory
+    chromedriver_dir = ChromeDriverManager().install()  # Download & get directory
 
-    # Look for the actual `chromedriver` binary inside the directory
-    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**/chromedriver"), recursive=True)
+    # Look for the actual `chromedriver` binary inside the extracted directory
+    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver"), recursive=True)
 
     if not possible_binaries:
         raise FileNotFoundError("ChromeDriver binary not found!")
@@ -81,7 +82,7 @@ def fetch_html(browser="chrome", retries=2):
             service = ChromeService(chromedriver_path)
 
             driver_class = webdriver.Chrome
-            logger.info("Initializing Chrome driver...")
+            logger.info(f"Using ChromeDriver from: {chromedriver_path}")
 
         if isinstance(options, ChromeOptions):
             for arg in chrome_options:
