@@ -9,7 +9,7 @@ import tempfile
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fetch_html(browser="webkit", retries=3):
+def fetch_html(browser="chromium", retries=3):
     """Fetch the dynamically loaded HTML content using Playwright."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
@@ -22,29 +22,34 @@ def fetch_html(browser="webkit", retries=3):
     for attempt in range(retries):
         try:
             with sync_playwright() as p:
-                # Map browser argument to Playwright browser types
-                browser_type = p.webkit if browser == "webkit" else p.chromium if browser == "chromium" else p.firefox
-                # Use WebKit-specific arguments (no --no-sandbox or --disable-dev-shm-usage)
-                browser_args = [] if browser == "webkit" else ["--no-sandbox", "--disable-dev-shm-usage"]
+                # Use Chromium with memory optimizations
+                browser_type = p.chromium if browser == "chromium" else p.webkit if browser == "webkit" else p.firefox
                 browser = browser_type.launch(
                     headless=True,
-                    args=browser_args
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--disable-extensions",
+                        "--disable-sync",
+                        "--single-process",  # Reduce memory usage
+                        "--disable-setuid-sandbox",
+                    ]
                 )
                 page = browser.new_page()
 
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
 
-                # Navigate to the URL with increased timeout
-                page.goto(url, wait_until="load", timeout=120000)  # 120-second timeout
+                # Navigate to the URL with increased timeout and lighter wait condition
+                page.goto(url, wait_until="domcontentloaded", timeout=120000)  # 120-second timeout, lighter wait
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
-                # Take an early screenshot and content dump for debugging
-                page.screenshot(path=f"debug_attempt_{attempt}.png")
+                # Log initial content length for debugging (no screenshot to save memory)
                 initial_content = page.content()
                 logger.info(f"Initial content length: {len(initial_content)} bytes")
 
-                # Reintroduce clicks to test functionality
+                # Keep clicks to test full workflow
                 # Wait for and click region
                 page.wait_for_selector("#anonymous_oe", state="attached", timeout=10000)
                 region_select = page.locator("#anonymous_oe")
@@ -63,9 +68,8 @@ def fetch_html(browser="webkit", retries=3):
                 department_link.click()
                 logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
 
-                # Get the final HTML content and take another screenshot
+                # Get the final HTML content
                 html_content = page.content()
-                page.screenshot(path=f"debug_final_{attempt}.png")
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
 
                 # Close the browser within the with block
@@ -106,7 +110,7 @@ def fetch_html(browser="webkit", retries=3):
     return modified_html
 
 if __name__ == "__main__":
-    browser = os.getenv("BROWSER", "webkit")
+    browser = os.getenv("BROWSER", "chromium")
     logger.info(f"Using browser: {browser}")
     html_content = fetch_html(browser)
     with open("output.html", "w", encoding="utf-8") as f:

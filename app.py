@@ -44,7 +44,7 @@ def detect_browser(user_agent):
     elif "opera" in user_agent or "opr" in user_agent:
         return "chromium"
     else:
-        return "chromium"  # Default to Chromium for Playwright
+        return "chromium"  # Default to chromium with memory optimizations
 
 @app.route("/")
 @cache.cached(timeout=60)  # Refresh every 60 seconds
