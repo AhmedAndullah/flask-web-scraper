@@ -1,7 +1,7 @@
 # Use the official Python 3.13 slim image as the base
 FROM python:3.13-slim
 
-# Install system dependencies for Selenium and Firefox
+# Install system dependencies for Selenium, Firefox, and proxy support
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \

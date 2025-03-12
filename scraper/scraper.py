@@ -4,8 +4,10 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.proxy import Proxy, ProxyType
 from bs4 import BeautifulSoup
 import requests
+from proxyscrape import create_collector
 import os
 import logging
 import time
@@ -16,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def fetch_html(use_selenium=True, retries=3):
-    """Fetch the dynamically loaded HTML content using Selenium or requests."""
+    """Fetch the dynamically loaded HTML content using Selenium or requests with proxy support."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
@@ -26,11 +28,16 @@ def fetch_html(use_selenium=True, retries=3):
 
     html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
     
-    # Try with requests first (lighter memory footprint)
+    # Set up proxy collector
+    proxy_collector = create_collector('my-collector', 'http')
+    proxy = proxy_collector.get_proxy({'country': 'DE'})  # Prefer German proxies for regional relevance
+
+    # Try with requests first (lighter memory footprint) with proxy
     for attempt in range(retries):
         try:
             logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries})...")
-            response = requests.get(url, timeout=60)  # Increased timeout to 60 seconds
+            proxies = {"http": proxy, "https": proxy} if proxy else {}
+            response = requests.get(url, timeout=60, proxies=proxies)
             response.raise_for_status()
             html_content = response.text
             logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
@@ -51,6 +58,14 @@ def fetch_html(use_selenium=True, retries=3):
         firefox_options.add_argument("--no-sandbox")
         firefox_options.add_argument("--disable-dev-shm-usage")
 
+        # Configure proxy for Selenium
+        if proxy:
+            proxy_obj = Proxy()
+            proxy_obj.proxy_type = ProxyType.MANUAL
+            proxy_obj.http_proxy = proxy
+            proxy_obj.ssl_proxy = proxy
+            firefox_options.proxy = proxy_obj
+
         # Configure geckodriver service
         service = Service(log_output=os.devnull)  # Suppress logs
 
@@ -65,7 +80,7 @@ def fetch_html(use_selenium=True, retries=3):
                 logger.info(f"Loading URL with Selenium (attempt {attempt + 1}/{retries})...")
 
                 # Set page load timeout
-                driver.set_page_load_timeout(120)  # Increased timeout to 120 seconds
+                driver.set_page_load_timeout(120)  # 120-second timeout
 
                 # Navigate to the URL
                 driver.get(url)
