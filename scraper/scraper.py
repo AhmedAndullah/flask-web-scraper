@@ -1,174 +1,113 @@
-from selenium import webdriver
-from selenium.webdriver.firefox.service import Service as FirefoxService
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.firefox.options import Options as FirefoxOptions
-from webdriver_manager.firefox import GeckoDriverManager
+from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 import os
 import logging
 import time
-import glob
 import tempfile
-from selenium.common.exceptions import WebDriverException, TimeoutException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_geckodriver_path(max_retries=3):
-    """Find the correct GeckoDriver binary inside the webdriver-manager cache with retries."""
-    for attempt in range(max_retries):
-        try:
-            manager = GeckoDriverManager()
-            base_dir = manager.install()
-            logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial GeckoDriver base directory: {base_dir}")
-
-            if os.path.isfile(base_dir):
-                base_dir = os.path.dirname(base_dir)
-            logger.info(f"Attempt {attempt + 1}/{max_retries}: Adjusted GeckoDriver base directory: {base_dir}")
-
-            possible_binaries = glob.glob(os.path.join(base_dir, "**", "geckodriver"), recursive=True)
-            logger.info(f"Attempt {attempt + 1}/{max_retries}: Possible binaries found: {possible_binaries}")
-
-            actual_binaries = []
-            for path in possible_binaries:
-                if not os.path.isfile(path):
-                    continue
-                os.chmod(path, 0o755)
-                file_stat = os.stat(path)
-                logger.info(f"Attempt {attempt + 1}/{max_retries}: Permissions for {path}: {oct(file_stat.st_mode & 0o777)}")
-                if os.access(path, os.X_OK):
-                    actual_binaries.append(path)
-                else:
-                    logger.warning(f"Attempt {attempt + 1}/{max_retries}: {path} is not executable, attempting to use anyway")
-                    actual_binaries.append(path)
-
-            if actual_binaries:
-                geckodriver_path = actual_binaries[0]
-                logger.info(f"Attempt {attempt + 1}/{max_retries}: Using GeckoDriver from: {geckodriver_path}")
-                return geckodriver_path
-            else:
-                logger.warning(f"Attempt {attempt + 1}/{max_retries}: No executable found, retrying...")
-                time.sleep(1)
-        except Exception as e:
-            logger.error(f"Attempt {attempt + 1}/{max_retries}: Error finding GeckoDriver: {e}")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            else:
-                raise
-
-    raise FileNotFoundError(f"GeckoDriver binary not found after {max_retries} attempts")
-
-def fetch_html(browser="firefox", retries=3):
-    """Fetch the dynamically loaded HTML content using Selenium with Firefox."""
+def fetch_html(browser="chromium", retries=3):
+    """Fetch the dynamically loaded HTML content using Playwright."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
-    os.environ['WDM_LOG_LEVEL'] = '0'  # Disable WebDriver Manager logs
-    firefox_options = FirefoxOptions()
-    firefox_options.add_argument("--headless")
-    firefox_options.add_argument("--no-sandbox")
-    firefox_options.add_argument("--disable-dev-shm-usage")
-    firefox_options.add_argument("--window-size=250,150")
-    firefox_options.add_argument("--disable-gpu")
-    firefox_options.add_argument("--disable-extensions")
-    firefox_options.add_argument("--disable-sync")
-
+    # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
     logger.info(f"Using user data directory: {user_data_dir}")
 
-    driver = None
-    try:
-        geckodriver_path = get_geckodriver_path()
-        logger.info(f"GeckoDriver path passed to service: {geckodriver_path}")
-        service = FirefoxService(
-            executable_path=geckodriver_path,
-            log_path="/tmp/geckodriver.log",
-            service_args=["--log", "debug"]
-        )
-        driver = webdriver.Firefox(service=service, options=firefox_options)
+    html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
+    for attempt in range(retries):
+        try:
+            with sync_playwright() as p:
+                # Map browser argument to Playwright browser types
+                browser_type = p.chromium if browser == "chromium" else p.firefox if browser == "firefox" else p.webkit
+                browser = browser_type.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--disable-extensions",
+                        "--disable-sync",
+                        "--window-size=250,150"
+                    ]
+                )
+                page = browser.new_page(user_data_dir=user_data_dir)
 
-        driver.set_page_load_timeout(20)
-        logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
-
-    except Exception as e:
-        logger.error(f"Error initializing driver for {browser}: {e}")
-        return "<h1>Error: Could not initialize browser driver. Please try again later.</h1>"
-
-    try:
-        for attempt in range(retries):
-            try:
+                logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
-                driver.get(url)
+
+                # Navigate to the URL and wait for the page to be fully loaded
+                page.goto(url, wait_until="networkidle", timeout=20000)  # 20-second timeout
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
+
+                # Wait for and click region
+                page.wait_for_selector("#anonymous_oe", state="attached", timeout=10000)  # Wait for presence
+                region_select = page.locator("#anonymous_oe")
+                region_select.click()
+                logger.info(f"Region selected in {time.time() - start_time:.2f} seconds")
+
+                # Wait for and click subject area
+                page.wait_for_selector("text=Innere Medizin", state="visible", timeout=10000)  # Wait for visibility
+                subject_area_link = page.locator("text=Innere Medizin")
+                subject_area_link.click()
+                logger.info(f"Subject area clicked in {time.time() - start_time:.2f} seconds")
+
+                # Wait for and click department
+                page.wait_for_selector("text=Allgemeine Innere Medizin", state="visible", timeout=10000)  # Wait for visibility
+                department_link = page.locator("text=Allgemeine Innere Medizin")
+                department_link.click()
+                logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
+
+                # Get the final HTML content
+                html_content = page.content()
+                logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
+
+                browser.close()
                 break
-            except TimeoutException as e:
-                logger.warning(f"Timeout loading URL on attempt {attempt + 1}: {e}")
-                if attempt < retries - 1:
-                    if driver:
-                        driver.quit()
-                    driver = webdriver.Firefox(service=service, options=firefox_options)
-                    driver.set_page_load_timeout(20)
-                    time.sleep(2)
-                else:
-                    raise WebDriverException("Failed to load URL after all retries")
-            except WebDriverException as e:
-                logger.warning(f"Failed to load URL on attempt {attempt + 1}: {e}")
-                if attempt == retries - 1:
-                    raise e
+
+        except Exception as e:
+            logger.error(f"Error loading URL on attempt {attempt + 1}: {e}")
+            if attempt < retries - 1:
                 time.sleep(2)
+            else:
+                logger.error(f"Failed to load URL after all retries: {e}")
+        finally:
+            if 'browser' in locals() and browser:
+                browser.close()
 
-        wait = WebDriverWait(driver, 10)
-        region_select = wait.until(EC.presence_of_element_located((By.ID, "anonymous_oe")))
-        region_select.click()
-        logger.info(f"Region selected in {time.time() - start_time:.2f} seconds")
+    # Process HTML with BeautifulSoup
+    soup = BeautifulSoup(html_content, 'html.parser')
+    logger.info("===== ORIGINAL HTML SNIPPET (AFTER JS) =====")
+    logger.info([tag['src'] for tag in soup.find_all(src=True)][:10])
+    logger.info("=================================")
 
-        subject_area_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Innere Medizin")))
-        subject_area_link.click()
-        logger.info(f"Subject area clicked in {time.time() - start_time:.2f} seconds")
+    # Adjust paths for static assets
+    for tag in soup.find_all(src=True):
+        if tag['src'].startswith('/bilder/'):
+            tag['src'] = tag['src'].replace('/bilder/', '/static/images/')
+        elif tag['src'].startswith('/layout/js/'):
+            tag['src'] = tag['src'].replace('/layout/js/', '/static/js/')
+    for tag in soup.find_all(href=True):
+        if tag['href'].startswith('/layout/themes/standard/'):
+            tag['href'] = tag['href'].replace('/layout/themes/standard/', '/static/css/')
 
-        department_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Allgemeine Innere Medizin")))
-        department_link.click()
-        logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
+    modified_html = str(soup)
 
-        html_content = driver.execute_script("return document.documentElement.outerHTML")
-        logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
-
-        soup = BeautifulSoup(html_content, 'html.parser')
-        logger.info("===== ORIGINAL HTML SNIPPET (AFTER JS) =====")
-        logger.info([tag['src'] for tag in soup.find_all(src=True)][:10])
-        logger.info("=================================")
-
-        for tag in soup.find_all(src=True):
-            if tag['src'].startswith('/bilder/'):
-                tag['src'] = tag['src'].replace('/bilder/', '/static/images/')
-            elif tag['src'].startswith('/layout/js/'):
-                tag['src'] = tag['src'].replace('/layout/js/', '/static/js/')
-        for tag in soup.find_all(href=True):
-            if tag['href'].startswith('/layout/themes/standard/'):
-                tag['href'] = tag['href'].replace('/layout/themes/standard/', '/static/css/')
-
-        modified_html = str(soup)
-
-    except Exception as e:
-        logger.error(f"Error during scraping: {e}")
-        modified_html = "<h1>Error: Could not load content. Please try again later.</h1>"
-
-    finally:
-        if driver:
-            driver.quit()
-        if os.path.exists(user_data_dir):
-            import shutil
-            shutil.rmtree(user_data_dir, ignore_errors=True)
-            logger.info(f"Cleaned up user data directory: {user_data_dir}")
-        logger.info(f"Total scraping time: {time.time() - start_time:.2f} seconds")
+    # Clean up the user data directory
+    if os.path.exists(user_data_dir):
+        import shutil
+        shutil.rmtree(user_data_dir, ignore_errors=True)
+        logger.info(f"Cleaned up user data directory: {user_data_dir}")
+    logger.info(f"Total scraping time: {time.time() - start_time:.2f} seconds")
 
     return modified_html
 
 if __name__ == "__main__":
-    browser = os.getenv("BROWSER", "firefox")
+    browser = os.getenv("BROWSER", "chromium")
     logger.info(f"Using browser: {browser}")
     html_content = fetch_html(browser)
     with open("output.html", "w", encoding="utf-8") as f:

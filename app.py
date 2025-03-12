@@ -31,20 +31,20 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 def detect_browser(user_agent):
-    """Detect browser based on user-agent string."""
+    """Detect browser based on user-agent string for Playwright."""
     user_agent = user_agent.lower()
     if "chrome" in user_agent and "edg" not in user_agent:
-        return "chrome"
+        return "chromium"
     elif "edg" in user_agent:  # Edge contains "edg" in user-agent
-        return "edge"
+        return "chromium"
     elif "safari" in user_agent and "chrome" not in user_agent:
-        return "safari"
+        return "webkit"
     elif "firefox" in user_agent:
         return "firefox"
     elif "opera" in user_agent or "opr" in user_agent:
-        return "opera"
+        return "chromium"
     else:
-        return "edge"  # Default to Edge if unknown
+        return "chromium"  # Default to Chromium for Playwright
 
 @app.route("/")
 @cache.cached(timeout=60)  # Refresh every 60 seconds
@@ -143,5 +143,3 @@ if __name__ == "__main__":
         from gunicorn.app.wsgiapp import run
         print("Running on Render with Gunicorn...")
         run()
-
-
