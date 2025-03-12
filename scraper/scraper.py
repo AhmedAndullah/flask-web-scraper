@@ -34,14 +34,24 @@ def get_chromedriver_path(max_retries=3):
             logger.info(f"Attempt {attempt + 1}/{max_retries}: Possible binaries found: {possible_binaries}")
 
             # Filter to find the actual executable
-            actual_binaries = [
-                path for path in possible_binaries
-                if os.path.isfile(path) and os.access(path, os.X_OK)  # Check if executable
-            ]
+            actual_binaries = []
+            for path in possible_binaries:
+                if not os.path.isfile(path):
+                    continue
+                # Ensure the file has executable permissions before checking
+                os.chmod(path, 0o755)  # Set executable permissions
+                # Log the file's permissions for debugging
+                file_stat = os.stat(path)
+                logger.info(f"Attempt {attempt + 1}/{max_retries}: Permissions for {path}: {oct(file_stat.st_mode & 0o777)}")
+                # Check if executable
+                if os.access(path, os.X_OK):
+                    actual_binaries.append(path)
+                else:
+                    logger.warning(f"Attempt {attempt + 1}/{max_retries}: {path} is not executable, attempting to use anyway")
+                    actual_binaries.append(path)  # Fallback: use the file even if not marked as executable
 
             if actual_binaries:
                 chromedriver_path = actual_binaries[0]  # Use the first valid executable found
-                os.chmod(chromedriver_path, 0o755)  # Ensure it's executable
                 logger.info(f"Attempt {attempt + 1}/{max_retries}: Using ChromeDriver from: {chromedriver_path}")
                 return chromedriver_path
             else:
