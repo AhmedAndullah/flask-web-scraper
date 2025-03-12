@@ -25,7 +25,6 @@ def get_chromedriver_path(max_retries=3):
             manager = ChromeDriverManager(driver_version="134.0.6998.88")
             base_dir = manager.install()
             logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial ChromeDriver base directory: {base_dir}")
-            # ... (rest of the function remains the same)
 
             # Ensure we are working with the correct directory (parent of any file)
             if os.path.isfile(base_dir):
@@ -113,6 +112,10 @@ def fetch_html(browser="chrome", retries=3):
     chrome_options.add_argument("--disable-notifications")
     chrome_options.add_argument("--incognito")
     chrome_options.add_argument("--remote-debugging-port=0")
+    # Enable Chrome logging for debugging
+    chrome_options.add_argument("--enable-logging")
+    chrome_options.add_argument("--log-level=0")
+    chrome_options.add_argument("--v=1")
 
     # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
@@ -123,7 +126,11 @@ def fetch_html(browser="chrome", retries=3):
     try:
         chromedriver_path = get_chromedriver_path()
         logger.info(f"ChromeDriver path passed to service: {chromedriver_path}")
-        service = ChromeService(executable_path=chromedriver_path)
+        service = ChromeService(
+            executable_path=chromedriver_path,
+            log_path="/tmp/chromedriver.log",  # Save ChromeDriver logs for debugging
+            service_args=["--verbose"]
+        )
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
         # Set a page load timeout
