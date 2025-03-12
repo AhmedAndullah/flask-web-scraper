@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -9,14 +10,12 @@ import os
 import logging
 import time
 import tempfile
-from selenium.webdriver.firefox.service import Service  # Import Service
-
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fetch_html(use_selenium=False, retries=3):
+def fetch_html(use_selenium=True, retries=3):
     """Fetch the dynamically loaded HTML content using Selenium or requests."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
@@ -26,26 +25,51 @@ def fetch_html(use_selenium=False, retries=3):
     logger.info(f"Using user data directory: {user_data_dir}")
 
     html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
-    if use_selenium:
+    
+    # Try with requests first (lighter memory footprint)
+    if not use_selenium:
+        for attempt in range(retries):
+            try:
+                logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries})...")
+                response = requests.get(url, timeout=30)
+                response.raise_for_status()
+                html_content = response.text
+                logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
+                break
+            except Exception as e:
+                logger.error(f"Error loading URL with requests on attempt {attempt + 1}: {e}")
+                if attempt < retries - 1:
+                    time.sleep(2)
+                else:
+                    logger.error(f"Failed to load URL after all retries: {e}")
+
+    # Use Selenium if requests fails or if explicitly enabled
+    if use_selenium or html_content.startswith("<h1>Error"):
         # Selenium with Firefox in headless mode
         firefox_options = Options()
         firefox_options.add_argument("--headless")
         firefox_options.add_argument("--no-sandbox")
         firefox_options.add_argument("--disable-dev-shm-usage")
 
+        # Configure geckodriver service
+        service = Service(log_output=os.devnull)  # Suppress logs
+
         for attempt in range(retries):
+            driver = None
             try:
                 driver = webdriver.Firefox(
                     options=firefox_options,
-                    service=Service()  # Correct way to initialize Firefox in newer Selenium versions
+                    service=service
                 )
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
-                logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
+                logger.info(f"Loading URL with Selenium (attempt {attempt + 1}/{retries})...")
 
                 # Navigate to the URL
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
+                # Temporarily disable clicks to isolate page load issue
+                """
                 # Wait for and click region
                 WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.ID, "anonymous_oe"))
@@ -69,6 +93,7 @@ def fetch_html(use_selenium=False, retries=3):
                 department_link = driver.find_element(By.LINK_TEXT, "Allgemeine Innere Medizin")
                 department_link.click()
                 logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
+                """
 
                 # Get the final HTML content
                 html_content = driver.page_source
@@ -79,30 +104,13 @@ def fetch_html(use_selenium=False, retries=3):
                 break
 
             except Exception as e:
-                logger.error(f"Error loading URL on attempt {attempt + 1}: {e}")
+                logger.error(f"Error loading URL with Selenium on attempt {attempt + 1}: {e}")
                 if attempt < retries - 1:
                     time.sleep(2)
                 else:
                     logger.error(f"Failed to load URL after all retries: {e}")
                     if driver:
                         driver.quit()
-
-    else:
-        # Fallback to requests if Selenium fails
-        for attempt in range(retries):
-            try:
-                logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries})...")
-                response = requests.get(url, timeout=30)
-                response.raise_for_status()
-                html_content = response.text
-                logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
-                break
-            except Exception as e:
-                logger.error(f"Error loading URL with requests on attempt {attempt + 1}: {e}")
-                if attempt < retries - 1:
-                    time.sleep(2)
-                else:
-                    logger.error(f"Failed to load URL after all retries: {e}")
 
     # Process HTML with BeautifulSoup
     soup = BeautifulSoup(html_content, 'html.parser')
