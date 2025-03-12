@@ -7,7 +7,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 from bs4 import BeautifulSoup
 import requests
-from proxyscrape import create_collector
 import os
 import logging
 import time
@@ -28,27 +27,32 @@ def fetch_html(use_selenium=True, retries=3):
 
     html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
     
-    # Set up proxy collector
-    proxy_collector = create_collector('my-collector', 'http')
-    proxy = proxy_collector.get_proxy({'country': 'DE'})  # Prefer German proxies for regional relevance
+    # Hardcoded list of proxies (replace with working proxies from free-proxy-list.net)
+    proxies = [
+        "http://51.89.14.149:80",  # Example proxy (Germany)
+        "http://94.228.163.145:80",  # Example proxy (Europe)
+        "http://167.71.5.83:3128"  # Example proxy (Europe)
+    ]
+    logger.info(f"Using proxies: {proxies}")
 
     # Try with requests first (lighter memory footprint) with proxy
     for attempt in range(retries):
-        try:
-            logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries})...")
-            proxies = {"http": proxy, "https": proxy} if proxy else {}
-            response = requests.get(url, timeout=60, proxies=proxies)
-            response.raise_for_status()
-            html_content = response.text
-            logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
-            break
-        except Exception as e:
-            logger.error(f"Error loading URL with requests on attempt {attempt + 1}: {e}")
-            if attempt < retries - 1:
-                time.sleep(2)
-            else:
-                logger.error(f"Failed to load URL with requests after all retries: {e}")
+        for proxy in proxies:
+            try:
+                logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries}, proxy: {proxy})...")
+                proxies_dict = {"http": proxy, "https": proxy}
+                response = requests.get(url, timeout=60, proxies=proxies_dict)
+                response.raise_for_status()
+                html_content = response.text
+                logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
                 break
+            except Exception as e:
+                logger.error(f"Error loading URL with requests (proxy: {proxy}) on attempt {attempt + 1}: {e}")
+                if attempt == retries - 1 and proxy == proxies[-1]:
+                    logger.error(f"Failed to load URL with requests after all retries and proxies: {e}")
+                continue
+        if html_content != "<h1>Error: Could not load content. Please try again later.</h1>":
+            break
 
     # Use Selenium if requests fails or if explicitly enabled
     if (use_selenium and html_content.startswith("<h1>Error")) or (use_selenium and not html_content):
@@ -59,12 +63,14 @@ def fetch_html(use_selenium=True, retries=3):
         firefox_options.add_argument("--disable-dev-shm-usage")
 
         # Configure proxy for Selenium
+        proxy = proxies[0] if proxies else None
         if proxy:
             proxy_obj = Proxy()
             proxy_obj.proxy_type = ProxyType.MANUAL
             proxy_obj.http_proxy = proxy
             proxy_obj.ssl_proxy = proxy
             firefox_options.proxy = proxy_obj
+            logger.info(f"Using Selenium with proxy: {proxy}")
 
         # Configure geckodriver service
         service = Service(log_output=os.devnull)  # Suppress logs
@@ -77,7 +83,7 @@ def fetch_html(use_selenium=True, retries=3):
                     service=service
                 )
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
-                logger.info(f"Loading URL with Selenium (attempt {attempt + 1}/{retries})...")
+                logger.info(f"Loading URL with Selenium (attempt {attempt + 1}/{retries}, proxy: {proxy})...")
 
                 # Set page load timeout
                 driver.set_page_load_timeout(120)  # 120-second timeout
@@ -123,12 +129,10 @@ def fetch_html(use_selenium=True, retries=3):
 
             except Exception as e:
                 logger.error(f"Error loading URL with Selenium on attempt {attempt + 1}: {e}")
-                if attempt < retries - 1:
-                    time.sleep(2)
-                else:
+                if attempt == retries - 1:
                     logger.error(f"Failed to load URL with Selenium after all retries: {e}")
-                    if driver:
-                        driver.quit()
+                if driver:
+                    driver.quit()
 
     # Process HTML with BeautifulSoup
     soup = BeautifulSoup(html_content, 'html.parser')
