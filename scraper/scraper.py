@@ -20,11 +20,12 @@ def fetch_html(browser="chromium", retries=3):
 
     html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
     for attempt in range(retries):
+        browser_instance = None  # Track browser instance for cleanup
         try:
             with sync_playwright() as p:
                 # Map browser argument to Playwright browser types
                 browser_type = p.chromium if browser == "chromium" else p.firefox if browser == "firefox" else p.webkit
-                browser = browser_type.launch(
+                browser_instance = browser_type.launch(
                     headless=True,
                     args=[
                         "--no-sandbox",
@@ -33,9 +34,10 @@ def fetch_html(browser="chromium", retries=3):
                         "--disable-extensions",
                         "--disable-sync",
                         "--window-size=250,150"
-                    ]
+                    ],
+                    user_data_dir=user_data_dir  # Correctly set at launch level
                 )
-                page = browser.new_page(user_data_dir=user_data_dir)
+                page = browser_instance.new_page()  # Removed user_data_dir here
 
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
@@ -66,9 +68,6 @@ def fetch_html(browser="chromium", retries=3):
                 html_content = page.content()
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
 
-                browser.close()
-                break
-
         except Exception as e:
             logger.error(f"Error loading URL on attempt {attempt + 1}: {e}")
             if attempt < retries - 1:
@@ -76,8 +75,8 @@ def fetch_html(browser="chromium", retries=3):
             else:
                 logger.error(f"Failed to load URL after all retries: {e}")
         finally:
-            if 'browser' in locals() and browser:
-                browser.close()
+            if browser_instance:
+                browser_instance.close()  # Close only if browser was initialized
 
     # Process HTML with BeautifulSoup
     soup = BeautifulSoup(html_content, 'html.parser')
