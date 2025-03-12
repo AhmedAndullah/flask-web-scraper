@@ -24,26 +24,21 @@ def get_chromedriver_path():
     """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
     chromedriver_dir = ChromeDriverManager().install()  # Download & get directory
 
-    # Look for the actual `chromedriver` binary inside the extracted directory
+    # Look inside all possible folders for ChromeDriver
     possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver"), recursive=True)
 
     if not possible_binaries:
-        raise FileNotFoundError("ChromeDriver binary not found!")
+        raise FileNotFoundError(f"ChromeDriver binary not found in {chromedriver_dir}")
 
-    chromedriver_path = possible_binaries[0]  # Use the first valid binary found
+    chromedriver_path = possible_binaries[0]  # Select the first valid binary found
     os.chmod(chromedriver_path, 0o755)  # Ensure it's executable
+    logger.info(f"Using ChromeDriver from: {chromedriver_path}")
     return chromedriver_path
 
 def fetch_html(browser="chrome", retries=2):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
-
-    # Safari user-agent to simulate Safari rendering if needed
-    safari_user_agent = (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 "
-        "(KHTML, like Gecko) Version/17.5 Safari/605.1.15"
-    )
 
     os.environ['WDM_LOG_LEVEL'] = '0'  # Disable WebDriver Manager logs
     chrome_options = [
@@ -57,38 +52,16 @@ def fetch_html(browser="chrome", retries=2):
     options = None
     service = None
     driver_class = None
-    use_safari_user_agent = False
 
     try:
-        is_macos = platform.system().lower() == "darwin"
-        if browser.lower() == "safari":
-            if is_macos:
-                options = SafariOptions()
-                driver_class = webdriver.Safari
-                logger.info("Initializing Safari driver on macOS...")
-            else:
-                logger.warning("Safari is not supported on non-macOS systems. Falling back to Chrome with Safari user-agent.")
-                options = ChromeOptions()
-                chromedriver_path = get_chromedriver_path()
-                service = ChromeService(chromedriver_path)
+        options = ChromeOptions()
+        chromedriver_path = get_chromedriver_path()
+        service = ChromeService(chromedriver_path)
+        driver_class = webdriver.Chrome
+        logger.info("Initializing Chrome driver...")
 
-                driver_class = webdriver.Chrome
-                use_safari_user_agent = True
-                logger.info("Initializing Chrome driver with Safari user-agent...")
-
-        else:
-            options = ChromeOptions()
-            chromedriver_path = get_chromedriver_path()
-            service = ChromeService(chromedriver_path)
-
-            driver_class = webdriver.Chrome
-            logger.info(f"Using ChromeDriver from: {chromedriver_path}")
-
-        if isinstance(options, ChromeOptions):
-            for arg in chrome_options:
-                options.add_argument(arg)
-            if use_safari_user_agent:
-                options.add_argument(f"--user-agent={safari_user_agent}")
+        for arg in chrome_options:
+            options.add_argument(arg)
 
         driver = driver_class(service=service, options=options) if service else driver_class(options=options)
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
