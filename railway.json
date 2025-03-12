@@ -1,0 +1,11 @@
+{
+    "builds": [
+      {
+        "src": "app.py",
+        "use": "@railway/python"
+      }
+    ],
+    "variables": {
+      "NIXPACKS_ENABLE_RUNTIME_CACHE": "true"
+    }
+  }

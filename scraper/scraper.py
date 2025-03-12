@@ -30,40 +30,15 @@ def fetch_html(browser="chrome", retries=2):
     )
 
     # Optimized options for Chrome to reduce memory usage
+    # In scraper.py, replace the chrome_options list with:
+    os.environ['WDM_LOG_LEVEL'] = '0'  # Disable WebDriver Manager logs
     chrome_options = [
-        "--headless=new",
-        "--disable-gpu",
-        "--no-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-images",
-        "--blink-settings=imagesEnabled=false",
-        "--disable-extensions",
-        "--window-size=800,600",
-        "--disable-background-networking",
-        "--disable-background-timer-throttling",
-        "--disable-client-side-phishing-detection",
-        "--disable-default-apps",
-        "--disable-hang-monitor",
-        "--disable-prompt-on-repost",
-        "--disable-sync",
-        "--disable-translate",
-        "--metrics-recording-only",
-        "--no-first-run",
-        "--safebrowsing-disable-auto-update",
-        "--disable-javascript-harmony-shipping",
-        "--disable-renderer-backgrounding",
-        "--single-process",
-        "--disable-dev-tools",
-        "--disable-logging",
-        "--disable-notifications",
-        "--mute-audio",
-        "--disable-software-rasterizer",
-        "--disable-features=TranslateUI",
-        "--no-zygote",
-        "--enable-logging",  # Enable Chrome logging for debugging
-        "--v=1",  # Verbose logging
-        "--log-path=/tmp/chrome.log"  # Save logs to a file
-    ]
+    "--headless=new",
+    "--disable-gpu",
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--window-size=800,600"
+    ]   
 
     options = None
     service = None
@@ -81,7 +56,8 @@ def fetch_html(browser="chrome", retries=2):
             else:
                 logger.warning("Safari is not supported on non-macOS systems. Falling back to Chrome with Safari user-agent.")
                 options = ChromeOptions()
-                chromedriver_path = ChromeDriverManager().install()
+                # Replace ChromeDriverManager installation with:
+                chromedriver_path = ChromeDriverManager(version="114.0.5735.90").install()                
                 subprocess.run(["chmod", "+x", chromedriver_path], check=True)
                 service = ChromeService(chromedriver_path)
                 driver_class = webdriver.Chrome
