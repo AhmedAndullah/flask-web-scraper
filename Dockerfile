@@ -31,5 +31,5 @@ COPY . .
 # Expose the port (Railway expects 8080 by default)
 EXPOSE 8080
 
-# Run the app with Gunicorn (single worker, increased timeout to 600 seconds)
+# Run the app with Gunicorn (single worker, timeout at 600 seconds)
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--timeout", "600", "--log-level", "info", "--preload"]

@@ -42,14 +42,15 @@ def fetch_html(browser="chromium", retries=3):
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
 
                 # Navigate to the URL with increased timeout and lighter wait condition
-                page.goto(url, wait_until="domcontentloaded", timeout=120000)  # 120-second timeout, lighter wait
+                page.goto(url, wait_until="domcontentloaded", timeout=120000)  # 120-second timeout
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
                 # Log initial content length for debugging (no screenshot to save memory)
                 initial_content = page.content()
                 logger.info(f"Initial content length: {len(initial_content)} bytes")
 
-                # Keep clicks to test full workflow
+                # Temporarily disable clicks to isolate page load issue
+                """
                 # Wait for and click region
                 page.wait_for_selector("#anonymous_oe", state="attached", timeout=10000)
                 region_select = page.locator("#anonymous_oe")
@@ -67,6 +68,7 @@ def fetch_html(browser="chromium", retries=3):
                 department_link = page.locator("text=Allgemeine Innere Medizin")
                 department_link.click()
                 logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
+                """
 
                 # Get the final HTML content
                 html_content = page.content()
