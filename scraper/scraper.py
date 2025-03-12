@@ -67,10 +67,9 @@ def fetch_html(browser="chrome", retries=2):
 # In the standard Chrome block:
         else:
             options = ChromeOptions()
-            chromedriver_dir = ChromeDriverManager(version="114.0.5735.90").install()
-            chromedriver_path = os.path.join(chromedriver_dir, "chromedriver")
-            subprocess.run(["chmod", "+x", chromedriver_path], check=True)
+            chromedriver_path = ChromeDriverManager().install()  # No version argument
             service = ChromeService(chromedriver_path)
+
             driver_class = webdriver.Chrome
             logger.info("Initializing Chrome driver...")
 
