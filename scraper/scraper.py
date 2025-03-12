@@ -21,8 +21,8 @@ def get_chromedriver_path(max_retries=3):
     """Find the correct ChromeDriver binary inside the webdriver-manager cache with retries."""
     for attempt in range(max_retries):
         try:
-            # Get the base directory from WebDriver Manager
-            base_dir = ChromeDriverManager().install()
+            # Force a specific stable version to avoid potential bugs in the latest
+            base_dir = ChromeDriverManager(version="133.0.6996.0").install()
             logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial ChromeDriver base directory: {base_dir}")
 
             # Ensure we are working with the correct directory (parent of any file)
@@ -78,7 +78,7 @@ def fetch_html(browser="chrome", retries=3):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=300,200")  # Further reduced window size
+    chrome_options.add_argument("--window-size=250,150")  # Even smaller window size
     chrome_options.add_argument("--no-first-run")
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-default-apps")
@@ -91,7 +91,10 @@ def fetch_html(browser="chrome", retries=3):
     chrome_options.add_argument("--single-process")
     chrome_options.add_argument("--disable-dev-tools")
     chrome_options.add_argument("--disable-logging")
-    chrome_options.add_argument("--mute-audio")  # Disable audio to save resources
+    chrome_options.add_argument("--mute-audio")
+    chrome_options.add_argument("--disable-notifications")  # Disable notifications
+    chrome_options.add_argument("--incognito")  # Use incognito mode to reduce profile overhead
+    chrome_options.add_argument("--remote-debugging-port=0")  # Disable remote debugging
 
     # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
@@ -106,7 +109,7 @@ def fetch_html(browser="chrome", retries=3):
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
         # Set a page load timeout
-        driver.set_page_load_timeout(25)  # Reduced to 25 seconds
+        driver.set_page_load_timeout(20)  # Reduced to 20 seconds
 
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
@@ -130,15 +133,15 @@ def fetch_html(browser="chrome", retries=3):
                     user_data_dir = tempfile.mkdtemp()
                     chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
                     driver = webdriver.Chrome(service=service, options=chrome_options)
-                    driver.set_page_load_timeout(25)
-                    time.sleep(1)  # Wait before retrying
+                    driver.set_page_load_timeout(20)
+                    time.sleep(2)  # Increased delay before retrying
                 else:
                     raise WebDriverException("Failed to load URL after all retries")
             except WebDriverException as e:
                 logger.warning(f"Failed to load URL on attempt {attempt + 1}: {e}")
                 if attempt == retries - 1:
                     raise e
-                time.sleep(1)
+                time.sleep(2)
 
         wait = WebDriverWait(driver, 10)
         region_select = wait.until(EC.presence_of_element_located((By.ID, "anonymous_oe")))
