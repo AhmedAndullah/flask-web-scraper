@@ -14,7 +14,7 @@ def fetch_html(browser="chromium", retries=3):
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
-    # Create a unique user data directory for this session
+    # Create a unique user data directory for this session (for logging or future use)
     user_data_dir = tempfile.mkdtemp()
     logger.info(f"Using user data directory: {user_data_dir}")
 
@@ -34,10 +34,9 @@ def fetch_html(browser="chromium", retries=3):
                         "--disable-extensions",
                         "--disable-sync",
                         "--window-size=250,150"
-                    ],
-                    user_data_dir=user_data_dir  # Correctly set at launch level
+                    ]
                 )
-                page = browser_instance.new_page()  # Removed user_data_dir here
+                page = browser_instance.new_page()
 
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
