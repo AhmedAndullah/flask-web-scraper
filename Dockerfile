@@ -1,36 +1,21 @@
 # Use the official Python 3.13 slim image as the base
 FROM python:3.13-slim
 
-# Install system dependencies for Chrome and ChromeDriver, plus debugging tools
+# Install system dependencies for Firefox and GeckoDriver
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
     gnupg \
     ca-certificates \
+    firefox-esr \
     libglib2.0-0 \
     libnss3 \
-    libgconf-2-4 \
     libfontconfig1 \
     libxrender1 \
     libxtst6 \
     libxi6 \
     libgtk-3-0 \
     file \
-    && rm -rf /var/lib/apt/lists/*
-
-# Add Google's signing key using a modern approach
-RUN wget -q -O /tmp/google-chrome-signing-key.pub https://dl.google.com/linux/linux_signing_key.pub \
-    && gpg --dearmor < /tmp/google-chrome-signing-key.pub > /usr/share/keyrings/google-chrome-archive-keyring.gpg \
-    && rm /tmp/google-chrome-signing-key.pub
-
-# Add the Chrome repository
-RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-archive-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
-
-# Install a specific version of Google Chrome (133.0.6996.0)
-RUN wget -q https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_133.0.6996.0-1_amd64.deb \
-    && apt-get update \
-    && apt-get install -y ./google-chrome-stable_133.0.6996.0-1_amd64.deb \
-    && rm google-chrome-stable_133.0.6996.0-1_amd64.deb \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up the working directory

@@ -1,141 +1,96 @@
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.firefox.service import Service as FirefoxService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from webdriver_manager.firefox import GeckoDriverManager
 from bs4 import BeautifulSoup
 import os
 import logging
 import time
 import glob
 import tempfile
-from selenium.common.exceptions import WebDriverException, TimeoutException, InvalidSessionIdException
+from selenium.common.exceptions import WebDriverException, TimeoutException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def get_chromedriver_path(max_retries=3):
-    """Find the correct ChromeDriver binary inside the webdriver-manager cache with retries."""
+def get_geckodriver_path(max_retries=3):
+    """Find the correct GeckoDriver binary inside the webdriver-manager cache with retries."""
     for attempt in range(max_retries):
         try:
-            # Use ChromeDriver version matching installed Chrome (134.0.6998.88)
-            manager = ChromeDriverManager(driver_version="134.0.6998.88")
+            manager = GeckoDriverManager()
             base_dir = manager.install()
-            logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial ChromeDriver base directory: {base_dir}")
+            logger.info(f"Attempt {attempt + 1}/{max_retries}: Initial GeckoDriver base directory: {base_dir}")
 
-            # Ensure we are working with the correct directory (parent of any file)
             if os.path.isfile(base_dir):
                 base_dir = os.path.dirname(base_dir)
-            logger.info(f"Attempt {attempt + 1}/{max_retries}: Adjusted ChromeDriver base directory: {base_dir}")
+            logger.info(f"Attempt {attempt + 1}/{max_retries}: Adjusted GeckoDriver base directory: {base_dir}")
 
-            # Look for the chromedriver binary explicitly
-            possible_binaries = glob.glob(os.path.join(base_dir, "**", "chromedriver"), recursive=True)
+            possible_binaries = glob.glob(os.path.join(base_dir, "**", "geckodriver"), recursive=True)
             logger.info(f"Attempt {attempt + 1}/{max_retries}: Possible binaries found: {possible_binaries}")
 
-            # Filter to find the actual executable
             actual_binaries = []
             for path in possible_binaries:
                 if not os.path.isfile(path):
                     continue
-                # Ensure the file has executable permissions before checking
-                os.chmod(path, 0o755)  # Set executable permissions
-                # Log the file's permissions for debugging
+                os.chmod(path, 0o755)
                 file_stat = os.stat(path)
                 logger.info(f"Attempt {attempt + 1}/{max_retries}: Permissions for {path}: {oct(file_stat.st_mode & 0o777)}")
-                # Check if executable
                 if os.access(path, os.X_OK):
                     actual_binaries.append(path)
                 else:
                     logger.warning(f"Attempt {attempt + 1}/{max_retries}: {path} is not executable, attempting to use anyway")
-                    actual_binaries.append(path)  # Fallback: use the file even if not marked as executable
+                    actual_binaries.append(path)
 
             if actual_binaries:
-                chromedriver_path = actual_binaries[0]  # Use the first valid executable found
-                logger.info(f"Attempt {attempt + 1}/{max_retries}: Using ChromeDriver from: {chromedriver_path}")
-                return chromedriver_path
+                geckodriver_path = actual_binaries[0]
+                logger.info(f"Attempt {attempt + 1}/{max_retries}: Using GeckoDriver from: {geckodriver_path}")
+                return geckodriver_path
             else:
                 logger.warning(f"Attempt {attempt + 1}/{max_retries}: No executable found, retrying...")
-                time.sleep(1)  # Wait before retrying
+                time.sleep(1)
         except Exception as e:
-            logger.error(f"Attempt {attempt + 1}/{max_retries}: Error finding ChromeDriver: {e}")
+            logger.error(f"Attempt {attempt + 1}/{max_retries}: Error finding GeckoDriver: {e}")
             if attempt < max_retries - 1:
                 time.sleep(1)
             else:
-                # Fallback to latest version if specific version fails
-                try:
-                    manager = ChromeDriverManager()
-                    base_dir = manager.install()
-                    logger.info(f"Fallback: Initial ChromeDriver base directory: {base_dir}")
-                    if os.path.isfile(base_dir):
-                        base_dir = os.path.dirname(base_dir)
-                    possible_binaries = glob.glob(os.path.join(base_dir, "**", "chromedriver"), recursive=True)
-                    if possible_binaries:
-                        chromedriver_path = possible_binaries[0]
-                        logger.info(f"Fallback: Using ChromeDriver from: {chromedriver_path}")
-                        return chromedriver_path
-                    else:
-                        raise FileNotFoundError("No ChromeDriver binary found in fallback attempt")
-                except Exception as fallback_e:
-                    logger.error(f"Fallback failed: {fallback_e}")
-                    raise
+                raise
 
-    raise FileNotFoundError(f"ChromeDriver binary not found after {max_retries} attempts")
+    raise FileNotFoundError(f"GeckoDriver binary not found after {max_retries} attempts")
 
-def fetch_html(browser="chrome", retries=3):
-    """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
+def fetch_html(browser="firefox", retries=3):
+    """Fetch the dynamically loaded HTML content using Selenium with Firefox."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
     os.environ['WDM_LOG_LEVEL'] = '0'  # Disable WebDriver Manager logs
-    chrome_options = ChromeOptions()
-    chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=250,150")
-    chrome_options.add_argument("--no-first-run")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-default-apps")
-    chrome_options.add_argument("--disable-background-networking")
-    chrome_options.add_argument("--disable-sync")
-    chrome_options.add_argument("--disable-translate")
-    chrome_options.add_argument("--disable-background-timer-throttling")
-    chrome_options.add_argument("--disable-client-side-phishing-detection")
-    chrome_options.add_argument("--disable-hang-monitor")
-    chrome_options.add_argument("--single-process")
-    chrome_options.add_argument("--disable-dev-tools")
-    chrome_options.add_argument("--disable-logging")
-    chrome_options.add_argument("--mute-audio")
-    chrome_options.add_argument("--disable-notifications")
-    chrome_options.add_argument("--incognito")
-    chrome_options.add_argument("--remote-debugging-port=0")
-    # Enable Chrome logging for debugging
-    chrome_options.add_argument("--enable-logging")
-    chrome_options.add_argument("--log-level=0")
-    chrome_options.add_argument("--v=1")
+    firefox_options = FirefoxOptions()
+    firefox_options.add_argument("--headless")
+    firefox_options.add_argument("--no-sandbox")
+    firefox_options.add_argument("--disable-dev-shm-usage")
+    firefox_options.add_argument("--window-size=250,150")
+    firefox_options.add_argument("--disable-gpu")
+    firefox_options.add_argument("--disable-extensions")
+    firefox_options.add_argument("--disable-sync")
 
-    # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
     logger.info(f"Using user data directory: {user_data_dir}")
-    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
     driver = None
     try:
-        chromedriver_path = get_chromedriver_path()
-        logger.info(f"ChromeDriver path passed to service: {chromedriver_path}")
-        service = ChromeService(
-            executable_path=chromedriver_path,
-            log_path="/tmp/chromedriver.log",  # Save ChromeDriver logs for debugging
-            service_args=["--verbose"]
+        geckodriver_path = get_geckodriver_path()
+        logger.info(f"GeckoDriver path passed to service: {geckodriver_path}")
+        service = FirefoxService(
+            executable_path=geckodriver_path,
+            log_path="/tmp/geckodriver.log",
+            service_args=["--log", "debug"]
         )
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        driver = webdriver.Firefox(service=service, options=firefox_options)
 
-        # Set a page load timeout
         driver.set_page_load_timeout(20)
-
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
     except Exception as e:
@@ -149,15 +104,12 @@ def fetch_html(browser="chrome", retries=3):
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
                 break
-            except (TimeoutException, InvalidSessionIdException) as e:
-                logger.warning(f"Error loading URL on attempt {attempt + 1}: {e}")
+            except TimeoutException as e:
+                logger.warning(f"Timeout loading URL on attempt {attempt + 1}: {e}")
                 if attempt < retries - 1:
-                    # Reinitialize driver on session invalidation
                     if driver:
                         driver.quit()
-                    user_data_dir = tempfile.mkdtemp()
-                    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-                    driver = webdriver.Chrome(service=service, options=chrome_options)
+                    driver = webdriver.Firefox(service=service, options=firefox_options)
                     driver.set_page_load_timeout(20)
                     time.sleep(2)
                 else:
@@ -189,7 +141,6 @@ def fetch_html(browser="chrome", retries=3):
         logger.info([tag['src'] for tag in soup.find_all(src=True)][:10])
         logger.info("=================================")
 
-        # Adjust paths for static assets
         for tag in soup.find_all(src=True):
             if tag['src'].startswith('/bilder/'):
                 tag['src'] = tag['src'].replace('/bilder/', '/static/images/')
@@ -208,7 +159,6 @@ def fetch_html(browser="chrome", retries=3):
     finally:
         if driver:
             driver.quit()
-        # Clean up the user data directory
         if os.path.exists(user_data_dir):
             import shutil
             shutil.rmtree(user_data_dir, ignore_errors=True)
@@ -218,7 +168,7 @@ def fetch_html(browser="chrome", retries=3):
     return modified_html
 
 if __name__ == "__main__":
-    browser = os.getenv("BROWSER", "chrome")
+    browser = os.getenv("BROWSER", "firefox")
     logger.info(f"Using browser: {browser}")
     html_content = fetch_html(browser)
     with open("output.html", "w", encoding="utf-8") as f:
