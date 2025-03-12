@@ -99,62 +99,60 @@ def fetch_html(use_selenium=True, retries=3):
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
-                # Wait for Cloudflare iframe or challenge (approximate)
+                # Check for Cloudflare CAPTCHA or error page
                 try:
-                    WebDriverWait(driver, 20).until(
+                    WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.TAG_NAME, "iframe"))
                     )
-                    logger.info(f"Cloudflare iframe detected in {time.time() - start_time:.2f} seconds")
-                    # Note: Automating Cloudflare challenges in headless mode is difficult; manual intervention or paid proxy may be needed
+                    logger.warning("Cloudflare iframe detected; automation may fail without paid proxy")
+                    html_content = driver.page_source  # Capture current state
+                    break  # Exit if Cloudflare is detected
                 except Exception as e:
-                    logger.warning(f"No Cloudflare iframe found or timed out: {e}")
+                    logger.info(f"No Cloudflare iframe or timed out: {e}")
 
                 # Wait for body to ensure page loads
-                WebDriverWait(driver, 20).until(
+                WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.TAG_NAME, "body"))
                 )
                 logger.info(f"Body element loaded in {time.time() - start_time:.2f} seconds")
 
-                # Reintroduce clicks with robust selectors
+                # Reintroduce clicks with robust selectors and fallback
+                region_selected = False
                 try:
-                    # Try multiple ways to find the region select element
-                    region_select = WebDriverWait(driver, 20).until(
+                    region_select = WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.XPATH, "//*[@id='anonymous_oe' or @name='anonymous_oe']"))
                     )
                     region_select.click()
                     logger.info(f"Region selected in {time.time() - start_time:.2f} seconds")
+                    region_selected = True
                 except Exception as e:
                     logger.error(f"Error finding region_select: {e}")
+                    logger.info("Skipping region selection due to error")
+
+                if region_selected:
                     try:
-                        region_select = WebDriverWait(driver, 20).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "[id='anonymous_oe']"))
+                        subject_area_link = WebDriverWait(driver, 10).until(
+                            EC.element_to_be_clickable((By.XPATH, "//a[text()='Innere Medizin']"))
                         )
-                        region_select.click()
-                        logger.info(f"Region selected (via CSS) in {time.time() - start_time:.2f} seconds")
+                        subject_area_link.click()
+                        logger.info(f"Subject area clicked in {time.time() - start_time:.2f} seconds")
                     except Exception as e:
-                        logger.error(f"Error finding region_select (via CSS): {e}")
+                        logger.error(f"Error finding subject_area_link: {e}")
+                        logger.info("Skipping subject area click due to error")
 
-                try:
-                    subject_area_link = WebDriverWait(driver, 20).until(
-                        EC.element_to_be_clickable((By.XPATH, "//a[text()='Innere Medizin']"))
-                    )
-                    subject_area_link.click()
-                    logger.info(f"Subject area clicked in {time.time() - start_time:.2f} seconds")
-                except Exception as e:
-                    logger.error(f"Error finding subject_area_link: {e}")
-
-                try:
-                    department_link = WebDriverWait(driver, 20).until(
-                        EC.element_to_be_clickable((By.XPATH, "//a[text()='Allgemeine Innere Medizin']"))
-                    )
-                    department_link.click()
-                    logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
-                except Exception as e:
-                    logger.error(f"Error finding department_link: {e}")
+                    try:
+                        department_link = WebDriverWait(driver, 10).until(
+                            EC.element_to_be_clickable((By.XPATH, "//a[text()='Allgemeine Innere Medizin']"))
+                        )
+                        department_link.click()
+                        logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
+                    except Exception as e:
+                        logger.error(f"Error finding department_link: {e}")
+                        logger.info("Skipping department click due to error")
 
                 # Wait for web-content div to load
                 try:
-                    WebDriverWait(driver, 20).until(
+                    WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.ID, "web-content"))
                     )
                     logger.info(f"Web content loaded in {time.time() - start_time:.2f} seconds")
@@ -163,7 +161,7 @@ def fetch_html(use_selenium=True, retries=3):
 
                 html_content = driver.page_source
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
-                logger.info(f"Full HTML content: {html_content[:500]}...")  # Log first 500 chars
+                logger.info(f"Full HTML content: {html_content[:500]}...")
                 logger.info(f"Current DOM state: {driver.find_element(By.TAG_NAME, 'body').get_attribute('innerHTML')[:500]}...")
 
                 driver.quit()
@@ -199,42 +197,48 @@ def fetch_html(use_selenium=True, retries=3):
                     logger.info(f"URL loaded (no proxy) in {time.time() - start_time:.2f} seconds")
 
                     # Wait for body
-                    WebDriverWait(driver, 20).until(
+                    WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.TAG_NAME, "body"))
                     )
                     logger.info(f"Body element loaded (no proxy) in {time.time() - start_time:.2f} seconds")
 
                     # Reintroduce clicks
+                    region_selected = False
                     try:
-                        region_select = WebDriverWait(driver, 20).until(
+                        region_select = WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.XPATH, "//*[@id='anonymous_oe' or @name='anonymous_oe']"))
                         )
                         region_select.click()
                         logger.info(f"Region selected (no proxy) in {time.time() - start_time:.2f} seconds")
+                        region_selected = True
                     except Exception as e:
                         logger.error(f"Error finding region_select (no proxy): {e}")
+                        logger.info("Skipping region selection due to error")
 
-                    try:
-                        subject_area_link = WebDriverWait(driver, 20).until(
-                            EC.element_to_be_clickable((By.XPATH, "//a[text()='Innere Medizin']"))
-                        )
-                        subject_area_link.click()
-                        logger.info(f"Subject area clicked (no proxy) in {time.time() - start_time:.2f} seconds")
-                    except Exception as e:
-                        logger.error(f"Error finding subject_area_link (no proxy): {e}")
+                    if region_selected:
+                        try:
+                            subject_area_link = WebDriverWait(driver, 10).until(
+                                EC.element_to_be_clickable((By.XPATH, "//a[text()='Innere Medizin']"))
+                            )
+                            subject_area_link.click()
+                            logger.info(f"Subject area clicked (no proxy) in {time.time() - start_time:.2f} seconds")
+                        except Exception as e:
+                            logger.error(f"Error finding subject_area_link (no proxy): {e}")
+                            logger.info("Skipping subject area click due to error")
 
-                    try:
-                        department_link = WebDriverWait(driver, 20).until(
-                            EC.element_to_be_clickable((By.XPATH, "//a[text()='Allgemeine Innere Medizin']"))
-                        )
-                        department_link.click()
-                        logger.info(f"Department clicked (no proxy) in {time.time() - start_time:.2f} seconds")
-                    except Exception as e:
-                        logger.error(f"Error finding department_link (no proxy): {e}")
+                        try:
+                            department_link = WebDriverWait(driver, 10).until(
+                                EC.element_to_be_clickable((By.XPATH, "//a[text()='Allgemeine Innere Medizin']"))
+                            )
+                            department_link.click()
+                            logger.info(f"Department clicked (no proxy) in {time.time() - start_time:.2f} seconds")
+                        except Exception as e:
+                            logger.error(f"Error finding department_link (no proxy): {e}")
+                            logger.info("Skipping department click due to error")
 
                     # Wait for web-content
                     try:
-                        WebDriverWait(driver, 20).until(
+                        WebDriverWait(driver, 10).until(
                             EC.presence_of_element_located((By.ID, "web-content"))
                         )
                         logger.info(f"Web content loaded (no proxy) in {time.time() - start_time:.2f} seconds")
@@ -269,7 +273,7 @@ def fetch_html(use_selenium=True, retries=3):
         elif tag['src'].startswith('/layout/js/'):
             tag['src'] = tag['src'].replace('/layout/js/', '/static/js/')
     for tag in soup.find_all(href=True):
-        if tag['href'].startswith('/layout/themes/standard/'):
+        if tag['href'].starts with('/layout/themes/standard/'):
             tag['href'] = tag['href'].replace('/layout/themes/standard/', '/static/css/')
 
     modified_html = str(soup)
