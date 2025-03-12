@@ -57,10 +57,9 @@ def fetch_html(browser="chrome", retries=2):
 # In the Safari fallback block:
                 logger.warning("Safari is not supported on non-macOS systems. Falling back to Chrome with Safari user-agent.")
                 options = ChromeOptions()
-                chromedriver_dir = ChromeDriverManager(version="114.0.5735.90").install()
-                chromedriver_path = os.path.join(chromedriver_dir, "chromedriver")
-                subprocess.run(["chmod", "+x", chromedriver_path], check=True)
+                chromedriver_path = ChromeDriverManager().install()
                 service = ChromeService(chromedriver_path)
+
                 driver_class = webdriver.Chrome
                 use_safari_user_agent = True
                 logger.info("Initializing Chrome driver with Safari user-agent...")
