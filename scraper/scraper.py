@@ -73,7 +73,7 @@ def fetch_html(browser="chrome", retries=2):
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
     os.environ['WDM_LOG_LEVEL'] = '0'  # Disable WebDriver Manager logs
-    chrome_options = Options()
+    chrome_options = ChromeOptions()  # Use the correct aliased name
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
