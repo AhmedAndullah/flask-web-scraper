@@ -30,28 +30,12 @@ firebase_admin.initialize_app(cred)
 # Initialize Firestore
 db = firestore.client()
 
-def detect_browser(user_agent):
-    """Detect browser based on user-agent string for Playwright."""
-    user_agent = user_agent.lower()
-    if "chrome" in user_agent and "edg" not in user_agent:
-        return "chromium"
-    elif "edg" in user_agent:  # Edge contains "edg" in user-agent
-        return "chromium"
-    elif "safari" in user_agent and "chrome" not in user_agent:
-        return "webkit"
-    elif "firefox" in user_agent:
-        return "firefox"
-    elif "opera" in user_agent or "opr" in user_agent:
-        return "chromium"
-    else:
-        return "chromium"  # Default to chromium with memory optimizations
-
 @app.route("/")
 @cache.cached(timeout=60)  # Refresh every 60 seconds
 def index():
-    browser = detect_browser(request.user_agent.string)
-    print(f"Detected browser: {browser}")
-    html_content = fetch_html(browser)
+    use_selenium = os.getenv("USE_SELENIUM", "true").lower() == "true"
+    print(f"Using Selenium: {use_selenium}")
+    html_content = fetch_html(use_selenium=use_selenium)
 
     # Debugging modification (using BeautifulSoup)
     from bs4 import BeautifulSoup

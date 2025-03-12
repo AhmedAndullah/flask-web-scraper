@@ -1,5 +1,10 @@
-from playwright.sync_api import sync_playwright
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
+import requests
 import os
 import logging
 import time
@@ -9,77 +14,93 @@ import tempfile
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fetch_html(browser="chromium", retries=3):
-    """Fetch the dynamically loaded HTML content using Playwright."""
+def fetch_html(use_selenium=True, retries=3):
+    """Fetch the dynamically loaded HTML content using Selenium or requests."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
-    # Create a unique user data directory for this session (for logging or future use)
+    # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
     logger.info(f"Using user data directory: {user_data_dir}")
 
     html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
-    for attempt in range(retries):
-        try:
-            with sync_playwright() as p:
-                # Use Chromium with minimal arguments
-                browser_type = p.chromium if browser == "chromium" else p.webkit if browser == "webkit" else p.firefox
-                browser = browser_type.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                    ]
-                )
-                page = browser.new_page()
+    if use_selenium:
+        # Selenium with Firefox in headless mode
+        firefox_options = Options()
+        firefox_options.add_argument("--headless")
+        firefox_options.add_argument("--no-sandbox")
+        firefox_options.add_argument("--disable-dev-shm-usage")
 
+        for attempt in range(retries):
+            try:
+                driver = webdriver.Firefox(
+                    options=firefox_options,
+                    service_log_path=os.path.devnull  # Suppress logs
+                )
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
 
-                # Navigate to the URL with increased timeout and lighter wait condition
-                page.goto(url, wait_until="domcontentloaded", timeout=120000)  # 120-second timeout
+                # Navigate to the URL
+                driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
-                # Temporarily remove initial content log to minimize memory usage
-                """
-                initial_content = page.content()
-                logger.info(f"Initial content length: {len(initial_content)} bytes")
-                """
-
-                # Keep clicks disabled to isolate page load
-                """
                 # Wait for and click region
-                page.wait_for_selector("#anonymous_oe", state="attached", timeout=10000)
-                region_select = page.locator("#anonymous_oe")
+                WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.ID, "anonymous_oe"))
+                )
+                region_select = driver.find_element(By.ID, "anonymous_oe")
                 region_select.click()
                 logger.info(f"Region selected in {time.time() - start_time:.2f} seconds")
 
                 # Wait for and click subject area
-                page.wait_for_selector("text=Innere Medizin", state="visible", timeout=10000)
-                subject_area_link = page.locator("text=Innere Medizin")
+                WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located((By.LINK_TEXT, "Innere Medizin"))
+                )
+                subject_area_link = driver.find_element(By.LINK_TEXT, "Innere Medizin")
                 subject_area_link.click()
                 logger.info(f"Subject area clicked in {time.time() - start_time:.2f} seconds")
 
                 # Wait for and click department
-                page.wait_for_selector("text=Allgemeine Innere Medizin", state="visible", timeout=10000)
-                department_link = page.locator("text=Allgemeine Innere Medizin")
+                WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located((By.LINK_TEXT, "Allgemeine Innere Medizin"))
+                )
+                department_link = driver.find_element(By.LINK_TEXT, "Allgemeine Innere Medizin")
                 department_link.click()
                 logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
-                """
 
                 # Get the final HTML content
-                html_content = page.content()
+                html_content = driver.page_source
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
 
-                # Close the browser within the with block
-                browser.close()
+                # Close the driver
+                driver.quit()
+                break
 
-        except Exception as e:
-            logger.error(f"Error loading URL on attempt {attempt + 1}: {e}")
-            if attempt < retries - 1:
-                time.sleep(2)
-            else:
-                logger.error(f"Failed to load URL after all retries: {e}")
+            except Exception as e:
+                logger.error(f"Error loading URL on attempt {attempt + 1}: {e}")
+                if attempt < retries - 1:
+                    time.sleep(2)
+                else:
+                    logger.error(f"Failed to load URL after all retries: {e}")
+                    if driver:
+                        driver.quit()
+
+    else:
+        # Fallback to requests if Selenium fails
+        for attempt in range(retries):
+            try:
+                logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries})...")
+                response = requests.get(url, timeout=30)
+                response.raise_for_status()
+                html_content = response.text
+                logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
+                break
+            except Exception as e:
+                logger.error(f"Error loading URL with requests on attempt {attempt + 1}: {e}")
+                if attempt < retries - 1:
+                    time.sleep(2)
+                else:
+                    logger.error(f"Failed to load URL after all retries: {e}")
 
     # Process HTML with BeautifulSoup
     soup = BeautifulSoup(html_content, 'html.parser')
@@ -109,8 +130,8 @@ def fetch_html(browser="chromium", retries=3):
     return modified_html
 
 if __name__ == "__main__":
-    browser = os.getenv("BROWSER", "chromium")
-    logger.info(f"Using browser: {browser}")
-    html_content = fetch_html(browser)
+    use_selenium = os.getenv("USE_SELENIUM", "true").lower() == "true"
+    logger.info(f"Using Selenium: {use_selenium}")
+    html_content = fetch_html(use_selenium=use_selenium)
     with open("output.html", "w", encoding="utf-8") as f:
         f.write(html_content)

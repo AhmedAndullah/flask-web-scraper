@@ -1,29 +1,27 @@
 # Use the official Python 3.13 slim image as the base
 FROM python:3.13-slim
 
-# Install system dependencies for Playwright
+# Install system dependencies for Selenium and Firefox
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
     gnupg \
     ca-certificates \
-    libglib2.0-0 \
-    libnss3 \
-    libfontconfig1 \
-    libxrender1 \
-    libxtst6 \
-    libxi6 \
-    libgtk-3-0 \
-    file \
+    firefox-esr \
     && rm -rf /var/lib/apt/lists/*
+
+# Install geckodriver
+RUN wget -q "https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-linux64.tar.gz" -O /tmp/geckodriver.tar.gz \
+    && tar -xzf /tmp/geckodriver.tar.gz -C /usr/local/bin \
+    && rm /tmp/geckodriver.tar.gz \
+    && chmod +x /usr/local/bin/geckodriver
 
 # Set up the working directory
 WORKDIR /app
 
-# Copy the requirements file and install Python dependencies, including Playwright
+# Copy the requirements file and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN playwright install --with-deps
 
 # Copy the rest of the application
 COPY . .
