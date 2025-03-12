@@ -9,7 +9,6 @@ from bs4 import BeautifulSoup
 import os
 import logging
 import time
-import platform
 import glob
 from selenium.common.exceptions import WebDriverException
 
@@ -21,11 +20,16 @@ def get_chromedriver_path():
     """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
     chromedriver_dir = ChromeDriverManager().install()  # Install and get directory
 
-    # Look inside all possible folders for ChromeDriver and ignore non-binary files
-    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver"), recursive=True)
+    # Look for the chromedriver binary explicitly
+    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**", "chromedriver*"), recursive=True)
 
-    # Remove unwanted files like 'THIRD_PARTY_NOTICES.chromedriver'
-    actual_binaries = [path for path in possible_binaries if os.path.isfile(path) and "chromedriver" in path and not path.endswith(".txt")]
+    # Filter to find the actual executable (exclude text files like THIRD_PARTY_NOTICES)
+    actual_binaries = [
+        path for path in possible_binaries 
+        if os.path.isfile(path) 
+        and "chromedriver" in os.path.basename(path).lower() 
+        and "third_party_notices" not in os.path.basename(path).lower()
+    ]
 
     if not actual_binaries:
         raise FileNotFoundError(f"ChromeDriver binary not found in {chromedriver_dir}")
@@ -47,12 +51,14 @@ def fetch_html(browser="chrome", retries=2):
         "--no-sandbox",
         "--disable-dev-shm-usage",
         "--window-size=800,600"
-    ]   
+    ]
 
     try:
         options = ChromeOptions()
+        # Specify the Chrome binary location installed in the Dockerfile
+        options.binary_location = "/usr/bin/google-chrome"
         chromedriver_path = get_chromedriver_path()
-        service = ChromeService(chromedriver_path)
+        service = ChromeService(executable_path=chromedriver_path)
         driver = webdriver.Chrome(service=service, options=options)
 
         for arg in chrome_options:
@@ -98,6 +104,7 @@ def fetch_html(browser="chrome", retries=2):
         logger.info([tag['src'] for tag in soup.find_all(src=True)][:10])
         logger.info("=================================")
 
+        # Adjust paths for static assets
         for tag in soup.find_all(src=True):
             if tag['src'].startswith('/bilder/'):
                 tag['src'] = tag['src'].replace('/bilder/', '/static/images/')
@@ -108,10 +115,6 @@ def fetch_html(browser="chrome", retries=2):
                 tag['href'] = tag['href'].replace('/layout/themes/standard/', '/static/css/')
 
         modified_html = str(soup)
-
-        logger.info("===== MODIFIED HTML SNIPPET =====")
-        logger.info([tag['src'] for tag in BeautifulSoup(modified_html, 'html.parser').find_all(src=True)][:10])
-        logger.info("=================================")
 
     except Exception as e:
         logger.error(f"Error during scraping: {e}")

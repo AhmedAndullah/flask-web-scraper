@@ -1,7 +1,7 @@
-# Use the official Python image as the base
+# Use the official Python 3.13 slim image as the base
 FROM python:3.13-slim
 
-# Install system dependencies for Chrome and Chromedriver
+# Install system dependencies for Chrome and ChromeDriver
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Add Google's signing key in a modern, non-deprecated way
+# Add Google's signing key using a modern approach
 RUN wget -q -O /tmp/google-chrome-signing-key.pub https://dl.google.com/linux/linux_signing_key.pub \
     && gpg --dearmor < /tmp/google-chrome-signing-key.pub > /usr/share/keyrings/google-chrome-archive-keyring.gpg \
     && rm /tmp/google-chrome-signing-key.pub
@@ -26,7 +26,8 @@ RUN wget -q -O /tmp/google-chrome-signing-key.pub https://dl.google.com/linux/li
 RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-archive-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
 
 # Install Google Chrome
-RUN apt-get update && apt-get install -y google-chrome-stable && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set up the working directory
 WORKDIR /app
@@ -38,7 +39,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Expose the port
+# Expose the port (Railway expects 8080 by default)
 EXPOSE 8080
 
 # Run the app with Gunicorn (single worker, increased timeout)
