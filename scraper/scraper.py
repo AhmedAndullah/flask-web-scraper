@@ -29,11 +29,18 @@ def fetch_html(use_selenium=True, retries=3):
     
     # Hardcoded list of proxies (replace with working proxies from free-proxy-list.net)
     proxies = [
-        "http://51.89.14.149:80",  # Example proxy (Germany)
-        "http://94.228.163.145:80",  # Example proxy (Europe)
-        "http://167.71.5.83:3128"  # Example proxy (Europe)
+        "http://188.68.52.244:80",  # Replace with a working proxy
+        "http://23.88.116.40:80",  # Replace with a working proxy
+        "http://3.127.62.252:80"  # Replace with a working proxy
     ]
     logger.info(f"Using proxies: {proxies}")
+
+    # Headers to mimic a real browser
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5"
+    }
 
     # Try with requests first (lighter memory footprint) with proxy
     for attempt in range(retries):
@@ -41,7 +48,7 @@ def fetch_html(use_selenium=True, retries=3):
             try:
                 logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries}, proxy: {proxy})...")
                 proxies_dict = {"http": proxy, "https": proxy}
-                response = requests.get(url, timeout=60, proxies=proxies_dict)
+                response = requests.get(url, timeout=60, proxies=proxies_dict, headers=headers)
                 response.raise_for_status()
                 html_content = response.text
                 logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
@@ -56,13 +63,12 @@ def fetch_html(use_selenium=True, retries=3):
 
     # Use Selenium if requests fails or if explicitly enabled
     if (use_selenium and html_content.startswith("<h1>Error")) or (use_selenium and not html_content):
-        # Selenium with Firefox in headless mode
+        # First try with proxy
         firefox_options = Options()
         firefox_options.add_argument("--headless")
         firefox_options.add_argument("--no-sandbox")
         firefox_options.add_argument("--disable-dev-shm-usage")
 
-        # Configure proxy for Selenium
         proxy = proxies[0] if proxies else None
         if proxy:
             proxy_obj = Proxy()
@@ -73,7 +79,7 @@ def fetch_html(use_selenium=True, retries=3):
             logger.info(f"Using Selenium with proxy: {proxy}")
 
         # Configure geckodriver service
-        service = Service(log_output=os.devnull)  # Suppress logs
+        service = Service(log_output=os.devnull)
 
         for attempt in range(retries):
             driver = None
@@ -85,54 +91,55 @@ def fetch_html(use_selenium=True, retries=3):
                 logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Loading URL with Selenium (attempt {attempt + 1}/{retries}, proxy: {proxy})...")
 
-                # Set page load timeout
-                driver.set_page_load_timeout(120)  # 120-second timeout
-
-                # Navigate to the URL
+                driver.set_page_load_timeout(120)
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
-                # Temporarily disable clicks to isolate page load issue
-                """
-                # Wait for and click region
-                WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.ID, "anonymous_oe"))
-                )
-                region_select = driver.find_element(By.ID, "anonymous_oe")
-                region_select.click()
-                logger.info(f"Region selected in {time.time() - start_time:.2f} seconds")
-
-                # Wait for and click subject area
-                WebDriverWait(driver, 10).until(
-                    EC.visibility_of_element_located((By.LINK_TEXT, "Innere Medizin"))
-                )
-                subject_area_link = driver.find_element(By.LINK_TEXT, "Innere Medizin")
-                subject_area_link.click()
-                logger.info(f"Subject area clicked in {time.time() - start_time:.2f} seconds")
-
-                # Wait for and click department
-                WebDriverWait(driver, 10).until(
-                    EC.visibility_of_element_located((By.LINK_TEXT, "Allgemeine Innere Medizin"))
-                )
-                department_link = driver.find_element(By.LINK_TEXT, "Allgemeine Innere Medizin")
-                department_link.click()
-                logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
-                """
-
-                # Get the final HTML content
                 html_content = driver.page_source
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
-
-                # Close the driver
                 driver.quit()
                 break
 
             except Exception as e:
-                logger.error(f"Error loading URL with Selenium on attempt {attempt + 1}: {e}")
+                logger.error(f"Error loading URL with Selenium (proxy: {proxy}) on attempt {attempt + 1}: {e}")
                 if attempt == retries - 1:
-                    logger.error(f"Failed to load URL with Selenium after all retries: {e}")
+                    logger.error(f"Failed to load URL with Selenium (with proxy) after all retries: {e}")
                 if driver:
                     driver.quit()
+
+        # If Selenium with proxy fails, try without proxy as a last resort
+        if html_content.startswith("<h1>Error"):
+            logger.info("All proxies failed, attempting Selenium without proxy...")
+            firefox_options = Options()
+            firefox_options.add_argument("--headless")
+            firefox_options.add_argument("--no-sandbox")
+            firefox_options.add_argument("--disable-dev-shm-usage")
+
+            for attempt in range(retries):
+                driver = None
+                try:
+                    driver = webdriver.Firefox(
+                        options=firefox_options,
+                        service=service
+                    )
+                    logger.info(f"Driver initialized (no proxy) in {time.time() - start_time:.2f} seconds")
+                    logger.info(f"Loading URL with Selenium (no proxy, attempt {attempt + 1}/{retries})...")
+
+                    driver.set_page_load_timeout(120)
+                    driver.get(url)
+                    logger.info(f"URL loaded (no proxy) in {time.time() - start_time:.2f} seconds")
+
+                    html_content = driver.page_source
+                    logger.info(f"HTML retrieved (no proxy) in {time.time() - start_time:.2f} seconds")
+                    driver.quit()
+                    break
+
+                except Exception as e:
+                    logger.error(f"Error loading URL with Selenium (no proxy) on attempt {attempt + 1}: {e}")
+                    if attempt == retries - 1:
+                        logger.error(f"Failed to load URL with Selenium (no proxy) after all retries: {e}")
+                    if driver:
+                        driver.quit()
 
     # Process HTML with BeautifulSoup
     soup = BeautifulSoup(html_content, 'html.parser')
