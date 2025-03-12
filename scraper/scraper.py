@@ -63,7 +63,8 @@ def fetch_html(browser="chrome", retries=2):
         options = ChromeOptions()
         options.binary_location = "/usr/bin/google-chrome"  # Point to Chrome binary
         chromedriver_path = get_chromedriver_path()
-        service = ChromeService(executable_path=chromedriver_path)
+        logger.info(f"ChromeDriver path passed to service: {chromedriver_path}")  # Debug the exact path
+        service = ChromeService(executable_path=chromedriver_path)  # Explicitly pass the executable path
         driver = webdriver.Chrome(service=service, options=options)
 
         for arg in chrome_options:
