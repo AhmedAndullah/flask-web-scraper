@@ -22,18 +22,13 @@ def fetch_html(browser="chromium", retries=3):
     for attempt in range(retries):
         try:
             with sync_playwright() as p:
-                # Use Chromium with memory optimizations
+                # Use Chromium with minimal arguments
                 browser_type = p.chromium if browser == "chromium" else p.webkit if browser == "webkit" else p.firefox
                 browser = browser_type.launch(
                     headless=True,
                     args=[
                         "--no-sandbox",
                         "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--disable-extensions",
-                        "--disable-sync",
-                        "--single-process",  # Reduce memory usage
-                        "--disable-setuid-sandbox",
                     ]
                 )
                 page = browser.new_page()
@@ -45,11 +40,13 @@ def fetch_html(browser="chromium", retries=3):
                 page.goto(url, wait_until="domcontentloaded", timeout=120000)  # 120-second timeout
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
-                # Log initial content length for debugging (no screenshot to save memory)
+                # Temporarily remove initial content log to minimize memory usage
+                """
                 initial_content = page.content()
                 logger.info(f"Initial content length: {len(initial_content)} bytes")
+                """
 
-                # Temporarily disable clicks to isolate page load issue
+                # Keep clicks disabled to isolate page load
                 """
                 # Wait for and click region
                 page.wait_for_selector("#anonymous_oe", state="attached", timeout=10000)
