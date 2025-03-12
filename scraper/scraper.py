@@ -288,7 +288,7 @@ def fetch_html(use_selenium=True, retries=3):
     return modified_html
 
 if __name__ == "__main__":
-    use_selenium = os.getenv("USE_SELENIUM", "true").lower() == "true"
+    use_selenium = os.getenv("USE_SELENIUM", "true" ).lower() == "true"
     logger.info(f"Using Selenium: {use_selenium}")
     html_content = fetch_html(use_selenium=use_selenium)
     with open("output.html", "w", encoding="utf-8") as f:
