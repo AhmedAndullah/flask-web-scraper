@@ -27,7 +27,7 @@ def fetch_html(use_selenium=True, retries=3):
 
     html_content = "<h1>Error: Could not load content. Please try again later.</h1>"
     
-    # Hardcoded list of proxies (replace with working proxies or use a paid service)
+    # Hardcoded list of proxies (replace with working proxies from free-proxy-list.net)
     proxies = [
         "3.127.62.252:80",  # Working proxy from logs
         "188.68.52.244:80",  # Test with new proxies
@@ -65,7 +65,7 @@ def fetch_html(use_selenium=True, retries=3):
         if html_content != "<h1>Error: Could not load content. Please try again later.</h1>" and "Error: Could not load content" not in html_content:
             break
 
-    # Use Selenium regardless of requests success if enabled, to handle dynamic content and Cloudflare
+    # Use Selenium regardless of requests success if enabled, to handle dynamic content
     if use_selenium:
         # First try with proxy
         firefox_options = Options()
@@ -99,17 +99,7 @@ def fetch_html(use_selenium=True, retries=3):
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
 
-                # Wait for Cloudflare iframe or challenge (approximate)
-                try:
-                    WebDriverWait(driver, 20).until(
-                        EC.presence_of_element_located((By.TAG_NAME, "iframe"))
-                    )
-                    logger.info(f"Cloudflare iframe detected in {time.time() - start_time:.2f} seconds")
-                    # Note: Automating Cloudflare challenges in headless mode is difficult; manual intervention or paid proxy may be needed
-                except Exception as e:
-                    logger.warning(f"No Cloudflare iframe found or timed out: {e}")
-
-                # Wait for body to ensure page loads
+                # Wait for an element to ensure page is fully loaded
                 WebDriverWait(driver, 20).until(
                     EC.presence_of_element_located((By.TAG_NAME, "body"))
                 )
@@ -137,12 +127,10 @@ def fetch_html(use_selenium=True, retries=3):
                 except Exception as e:
                     logger.error(f"Error during Selenium interactions: {e}")
 
-                # Wait for web-content div to load
+                # Wait for final content
                 WebDriverWait(driver, 20).until(
-                    EC.presence_of_element_located((By.ID, "web-content"))
+                    EC.presence_of_element_located((By.TAG_NAME, "body"))
                 )
-                logger.info(f"Web content loaded in {time.time() - start_time:.2f} seconds")
-
                 html_content = driver.page_source
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
                 logger.info(f"Full HTML content: {html_content[:500]}...")  # Log first 500 chars
@@ -179,7 +167,7 @@ def fetch_html(use_selenium=True, retries=3):
                     driver.get(url)
                     logger.info(f"URL loaded (no proxy) in {time.time() - start_time:.2f} seconds")
 
-                    # Wait for body
+                    # Wait for an element to ensure page is fully loaded
                     WebDriverWait(driver, 20).until(
                         EC.presence_of_element_located((By.TAG_NAME, "body"))
                     )
@@ -207,12 +195,10 @@ def fetch_html(use_selenium=True, retries=3):
                     except Exception as e:
                         logger.error(f"Error during Selenium interactions (no proxy): {e}")
 
-                    # Wait for web-content
+                    # Wait for final content
                     WebDriverWait(driver, 20).until(
-                        EC.presence_of_element_located((By.ID, "web-content"))
+                        EC.presence_of_element_located((By.TAG_NAME, "body"))
                     )
-                    logger.info(f"Web content loaded (no proxy) in {time.time() - start_time:.2f} seconds")
-
                     html_content = driver.page_source
                     logger.info(f"HTML retrieved (no proxy) in {time.time() - start_time:.2f} seconds")
                     logger.info(f"Full HTML content (no proxy): {html_content[:500]}...")
