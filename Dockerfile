@@ -26,8 +26,11 @@ RUN wget -q -O /tmp/google-chrome-signing-key.pub https://dl.google.com/linux/li
 # Add the Chrome repository
 RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-archive-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
 
-# Install Google Chrome
-RUN apt-get update && apt-get install -y google-chrome-stable \
+# Install a specific version of Google Chrome (133.0.6996.0)
+RUN wget -q https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_133.0.6996.0-1_amd64.deb \
+    && apt-get update \
+    && apt-get install -y ./google-chrome-stable_133.0.6996.0-1_amd64.deb \
+    && rm google-chrome-stable_133.0.6996.0-1_amd64.deb \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up the working directory
