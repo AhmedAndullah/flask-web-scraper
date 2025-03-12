@@ -73,28 +73,26 @@ def fetch_html(browser="chrome", retries=2):
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
     os.environ['WDM_LOG_LEVEL'] = '0'  # Disable WebDriver Manager logs
-    chrome_options = [
-        "--headless=new",
-        "--disable-gpu",
-        "--no-sandbox",
-        "--disable-dev-shm-usage",
-        "--window-size=800,600"
-    ]
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=800,600")
+    chrome_options.add_argument("--no-first-run")  # Prevent first-run dialog
+    chrome_options.add_argument("--disable-extensions")  # Disable extensions to reduce overhead
+    chrome_options.add_argument("--disable-default-apps")  # Disable default apps
 
     # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
-    chrome_options.append(f"--user-data-dir={user_data_dir}")
+    logger.info(f"Using user data directory: {user_data_dir}")
+    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
     try:
-        options = ChromeOptions()
-        options.binary_location = "/usr/bin/google-chrome"  # Point to Chrome binary
         chromedriver_path = get_chromedriver_path()
         logger.info(f"ChromeDriver path passed to service: {chromedriver_path}")  # Debug the exact path
         service = ChromeService(executable_path=chromedriver_path)  # Explicitly pass the executable path
-        driver = webdriver.Chrome(service=service, options=options)
-
-        for arg in chrome_options:
-            options.add_argument(arg)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
 
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
@@ -158,6 +156,7 @@ def fetch_html(browser="chrome", retries=2):
         if os.path.exists(user_data_dir):
             import shutil
             shutil.rmtree(user_data_dir, ignore_errors=True)
+            logger.info(f"Cleaned up user data directory: {user_data_dir}")
         logger.info(f"Total scraping time: {time.time() - start_time:.2f} seconds")
 
     return modified_html
