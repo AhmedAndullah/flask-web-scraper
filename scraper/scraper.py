@@ -30,7 +30,7 @@ def fetch_html(use_selenium=True, retries=3):
     for attempt in range(retries):
         try:
             logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries})...")
-            response = requests.get(url, timeout=30)
+            response = requests.get(url, timeout=60)  # Increased timeout to 60 seconds
             response.raise_for_status()
             html_content = response.text
             logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
@@ -65,7 +65,7 @@ def fetch_html(use_selenium=True, retries=3):
                 logger.info(f"Loading URL with Selenium (attempt {attempt + 1}/{retries})...")
 
                 # Set page load timeout
-                driver.set_page_load_timeout(60)  # 60-second timeout
+                driver.set_page_load_timeout(120)  # Increased timeout to 120 seconds
 
                 # Navigate to the URL
                 driver.get(url)
