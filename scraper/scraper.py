@@ -16,7 +16,7 @@ from selenium.webdriver.firefox.service import Service  # Import Service
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fetch_html(use_selenium=True, retries=3):
+def fetch_html(use_selenium=False, retries=3):
     """Fetch the dynamically loaded HTML content using Selenium or requests."""
     start_time = time.time()
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
