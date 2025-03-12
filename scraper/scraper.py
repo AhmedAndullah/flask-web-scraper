@@ -11,7 +11,7 @@ import logging
 import time
 import glob
 import tempfile
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import WebDriverException, TimeoutException
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -73,7 +73,7 @@ def fetch_html(browser="chrome", retries=2):
     url = "https://www.ivena-niedersachsen.de/leitstellenansicht.php"
 
     os.environ['WDM_LOG_LEVEL'] = '0'  # Disable WebDriver Manager logs
-    chrome_options = ChromeOptions()  # Use the correct aliased name
+    chrome_options = ChromeOptions()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
@@ -82,6 +82,13 @@ def fetch_html(browser="chrome", retries=2):
     chrome_options.add_argument("--no-first-run")  # Prevent first-run dialog
     chrome_options.add_argument("--disable-extensions")  # Disable extensions to reduce overhead
     chrome_options.add_argument("--disable-default-apps")  # Disable default apps
+    # Memory optimization options
+    chrome_options.add_argument("--disable-background-networking")
+    chrome_options.add_argument("--disable-sync")
+    chrome_options.add_argument("--disable-translate")
+    chrome_options.add_argument("--disable-background-timer-throttling")
+    chrome_options.add_argument("--disable-client-side-phishing-detection")
+    chrome_options.add_argument("--disable-hang-monitor")
 
     # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
@@ -93,6 +100,9 @@ def fetch_html(browser="chrome", retries=2):
         logger.info(f"ChromeDriver path passed to service: {chromedriver_path}")  # Debug the exact path
         service = ChromeService(executable_path=chromedriver_path)  # Explicitly pass the executable path
         driver = webdriver.Chrome(service=service, options=chrome_options)
+
+        # Set a page load timeout to prevent hanging
+        driver.set_page_load_timeout(45)  # 45 seconds to load the page
 
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
@@ -107,6 +117,11 @@ def fetch_html(browser="chrome", retries=2):
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
                 break
+            except TimeoutException as e:
+                logger.warning(f"Timeout loading URL on attempt {attempt + 1}: {e}")
+                if attempt == retries - 1:
+                    raise WebDriverException("Failed to load URL after all retries due to timeout")
+                time.sleep(1)
             except WebDriverException as e:
                 logger.warning(f"Failed to load URL on attempt {attempt + 1}: {e}")
                 if attempt == retries - 1:
