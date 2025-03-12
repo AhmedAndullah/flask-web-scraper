@@ -80,7 +80,7 @@ def fetch_html(browser="chrome", retries=2):
                             break
 
             # Make sure the file is executable
-            shutil.chmod(chromedriver_path, 0o755)
+            os.chmod(chromedriver_path, 0o755)
 
             service = ChromeService(chromedriver_path)
 
