@@ -12,13 +12,26 @@ import logging
 import subprocess
 import time
 import platform
+import glob
 from selenium.common.exceptions import WebDriverException
-import shutil
-
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def get_chromedriver_path():
+    """Find the correct ChromeDriver binary inside the webdriver-manager cache."""
+    chromedriver_dir = ChromeDriverManager().install()  # Install and get the directory
+
+    # Look for the actual `chromedriver` binary inside the directory
+    possible_binaries = glob.glob(os.path.join(chromedriver_dir, "**/chromedriver"), recursive=True)
+
+    if not possible_binaries:
+        raise FileNotFoundError("ChromeDriver binary not found!")
+
+    chromedriver_path = possible_binaries[0]  # Use the first valid binary found
+    os.chmod(chromedriver_path, 0o755)  # Ensure it's executable
+    return chromedriver_path
 
 def fetch_html(browser="chrome", retries=2):
     """Fetch the dynamically loaded HTML content using Selenium with the specified browser."""
@@ -31,15 +44,13 @@ def fetch_html(browser="chrome", retries=2):
         "(KHTML, like Gecko) Version/17.5 Safari/605.1.15"
     )
 
-    # Optimized options for Chrome to reduce memory usage
-    # In scraper.py, replace the chrome_options list with:
     os.environ['WDM_LOG_LEVEL'] = '0'  # Disable WebDriver Manager logs
     chrome_options = [
-    "--headless=new",
-    "--disable-gpu",
-    "--no-sandbox",
-    "--disable-dev-shm-usage",
-    "--window-size=800,600"
+        "--headless=new",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--window-size=800,600"
     ]   
 
     options = None
@@ -48,7 +59,6 @@ def fetch_html(browser="chrome", retries=2):
     use_safari_user_agent = False
 
     try:
-        # Check if we're on macOS and Safari is requested
         is_macos = platform.system().lower() == "darwin"
         if browser.lower() == "safari":
             if is_macos:
@@ -56,72 +66,52 @@ def fetch_html(browser="chrome", retries=2):
                 driver_class = webdriver.Safari
                 logger.info("Initializing Safari driver on macOS...")
             else:
-# In the Safari fallback block:
                 logger.warning("Safari is not supported on non-macOS systems. Falling back to Chrome with Safari user-agent.")
                 options = ChromeOptions()
-                chromedriver_path = ChromeDriverManager().install()
+                chromedriver_path = get_chromedriver_path()
                 service = ChromeService(chromedriver_path)
 
                 driver_class = webdriver.Chrome
                 use_safari_user_agent = True
                 logger.info("Initializing Chrome driver with Safari user-agent...")
 
-# In the standard Chrome block:
         else:
             options = ChromeOptions()
-            chromedriver_path = ChromeDriverManager().install()
-
-            # Ensure we are selecting the correct ChromeDriver binary
-            if os.path.isdir(chromedriver_path):  # Check if the path is a directory
-                for root, dirs, files in os.walk(chromedriver_path):
-                    for file in files:
-                        if "chromedriver" in file and not file.endswith(".txt"):  # Ensure it's not a notice file
-                            chromedriver_path = os.path.join(root, file)
-                            break
-
-            # Make sure the file is executable
-            os.chmod(chromedriver_path, 0o755)
-
+            chromedriver_path = get_chromedriver_path()
             service = ChromeService(chromedriver_path)
 
             driver_class = webdriver.Chrome
             logger.info("Initializing Chrome driver...")
 
-        # Apply Chrome options if using Chrome
         if isinstance(options, ChromeOptions):
             for arg in chrome_options:
                 options.add_argument(arg)
             if use_safari_user_agent:
                 options.add_argument(f"--user-agent={safari_user_agent}")
 
-        # Initialize the driver
         driver = driver_class(service=service, options=options) if service else driver_class(options=options)
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
     except Exception as e:
         logger.error(f"Error initializing driver for {browser}: {e}")
-        if "disconnected" in str(e).lower() or "session deleted" in str(e).lower():
-            logger.error("Chrome likely crashed during initialization. Consider increasing memory or optimizing options.")
         return "<h1>Error: Could not initialize browser driver. Please try again later.</h1>"
 
     try:
-        # Retry loading the URL in case of transient failures
         for attempt in range(retries):
             try:
                 logger.info(f"Loading URL (attempt {attempt + 1}/{retries})...")
                 driver.get(url)
                 logger.info(f"URL loaded in {time.time() - start_time:.2f} seconds")
-                break  # Success, exit the retry loop
+                break
             except WebDriverException as e:
                 logger.warning(f"Failed to load URL on attempt {attempt + 1}: {e}")
-                if attempt == retries - 1:  # Last attempt
+                if attempt == retries - 1:
                     raise e
-                time.sleep(1)  # Wait before retrying
+                time.sleep(1)
 
-        # Use WebDriverWait for dynamic content
         wait = WebDriverWait(driver, 10)
         region_select = wait.until(EC.presence_of_element_located((By.ID, "anonymous_oe")))
-        Select(region_select).select_by_visible_text("Region Hannover")
+        region_select.click()
         logger.info(f"Region selected in {time.time() - start_time:.2f} seconds")
 
         subject_area_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, "Innere Medizin")))
@@ -135,14 +125,11 @@ def fetch_html(browser="chrome", retries=2):
         html_content = driver.execute_script("return document.documentElement.outerHTML")
         logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
 
-        # Debugging output
-        logger.info("===== ORIGINAL HTML SNIPPET (AFTER JS) =====")
         soup = BeautifulSoup(html_content, 'html.parser')
+        logger.info("===== ORIGINAL HTML SNIPPET (AFTER JS) =====")
         logger.info([tag['src'] for tag in soup.find_all(src=True)][:10])
         logger.info("=================================")
 
-        # Modify HTML using BeautifulSoup
-        soup = BeautifulSoup(html_content, 'html.parser')
         for tag in soup.find_all(src=True):
             if tag['src'].startswith('/bilder/'):
                 tag['src'] = tag['src'].replace('/bilder/', '/static/images/')
@@ -154,18 +141,12 @@ def fetch_html(browser="chrome", retries=2):
 
         modified_html = str(soup)
 
-        # Debugging output after modification
         logger.info("===== MODIFIED HTML SNIPPET =====")
         logger.info([tag['src'] for tag in BeautifulSoup(modified_html, 'html.parser').find_all(src=True)][:10])
         logger.info("=================================")
 
     except Exception as e:
         logger.error(f"Error during scraping: {e}")
-        # Check for Chrome logs if they exist
-        if os.path.exists("/tmp/chrome.log"):
-            with open("/tmp/chrome.log", "r") as log_file:
-                chrome_logs = log_file.read()
-                logger.error(f"Chrome logs:\n{chrome_logs}")
         modified_html = "<h1>Error: Could not load content. Please try again later.</h1>"
 
     finally:
