@@ -78,7 +78,7 @@ def fetch_html(browser="chrome", retries=2):
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=800,600")
+    chrome_options.add_argument("--window-size=400,300")  # Reduced window size to save memory
     chrome_options.add_argument("--no-first-run")  # Prevent first-run dialog
     chrome_options.add_argument("--disable-extensions")  # Disable extensions to reduce overhead
     chrome_options.add_argument("--disable-default-apps")  # Disable default apps
@@ -89,6 +89,9 @@ def fetch_html(browser="chrome", retries=2):
     chrome_options.add_argument("--disable-background-timer-throttling")
     chrome_options.add_argument("--disable-client-side-phishing-detection")
     chrome_options.add_argument("--disable-hang-monitor")
+    chrome_options.add_argument("--single-process")  # Run Chrome in a single process to reduce memory
+    chrome_options.add_argument("--disable-dev-tools")  # Disable developer tools
+    chrome_options.add_argument("--disable-logging")  # Reduce logging overhead
 
     # Create a unique user data directory for this session
     user_data_dir = tempfile.mkdtemp()
@@ -101,8 +104,8 @@ def fetch_html(browser="chrome", retries=2):
         service = ChromeService(executable_path=chromedriver_path)  # Explicitly pass the executable path
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        # Set a page load timeout to prevent hanging
-        driver.set_page_load_timeout(45)  # 45 seconds to load the page
+        # Set a page load timeout to prevent excessive resource usage
+        driver.set_page_load_timeout(30)  # Reduced to 30 seconds
 
         logger.info(f"Driver initialized in {time.time() - start_time:.2f} seconds")
 
