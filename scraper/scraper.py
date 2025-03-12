@@ -67,15 +67,15 @@ def fetch_html(browser="chromium", retries=3):
                 html_content = page.content()
                 logger.info(f"HTML retrieved in {time.time() - start_time:.2f} seconds")
 
+                # Close the browser within the with block
+                browser_instance.close()
+
         except Exception as e:
             logger.error(f"Error loading URL on attempt {attempt + 1}: {e}")
             if attempt < retries - 1:
                 time.sleep(2)
             else:
                 logger.error(f"Failed to load URL after all retries: {e}")
-        finally:
-            if browser_instance:
-                browser_instance.close()  # Close only if browser was initialized
 
     # Process HTML with BeautifulSoup
     soup = BeautifulSoup(html_content, 'html.parser')
