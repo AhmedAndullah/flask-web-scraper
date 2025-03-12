@@ -22,14 +22,13 @@ def fetch_html(browser="webkit", retries=3):
     for attempt in range(retries):
         try:
             with sync_playwright() as p:
-                # Use WebKit for lower memory usage
-                browser_type = p.webkit
+                # Map browser argument to Playwright browser types
+                browser_type = p.webkit if browser == "webkit" else p.chromium if browser == "chromium" else p.firefox
+                # Use WebKit-specific arguments (no --no-sandbox or --disable-dev-shm-usage)
+                browser_args = [] if browser == "webkit" else ["--no-sandbox", "--disable-dev-shm-usage"]
                 browser = browser_type.launch(
                     headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage"  # Minimal args to reduce memory
-                    ]
+                    args=browser_args
                 )
                 page = browser.new_page()
 
@@ -45,8 +44,7 @@ def fetch_html(browser="webkit", retries=3):
                 initial_content = page.content()
                 logger.info(f"Initial content length: {len(initial_content)} bytes")
 
-                # Temporarily comment out clicks to isolate page load issue
-                """
+                # Reintroduce clicks to test functionality
                 # Wait for and click region
                 page.wait_for_selector("#anonymous_oe", state="attached", timeout=10000)
                 region_select = page.locator("#anonymous_oe")
@@ -64,7 +62,6 @@ def fetch_html(browser="webkit", retries=3):
                 department_link = page.locator("text=Allgemeine Innere Medizin")
                 department_link.click()
                 logger.info(f"Department clicked in {time.time() - start_time:.2f} seconds")
-                """
 
                 # Get the final HTML content and take another screenshot
                 html_content = page.content()
