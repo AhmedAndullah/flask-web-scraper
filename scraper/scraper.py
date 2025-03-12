@@ -29,9 +29,9 @@ def fetch_html(use_selenium=True, retries=3):
     
     # Hardcoded list of proxies (replace with working proxies from free-proxy-list.net)
     proxies = [
-        "http://188.68.52.244:80",  # Replace with a working proxy
-        "http://23.88.116.40:80",  # Replace with a working proxy
-        "http://3.127.62.252:80"  # Replace with a working proxy
+        "188.68.52.244:80",  # Replace with a working proxy (without scheme)
+        "23.88.116.40:80",   # Replace with a working proxy (without scheme)
+        "3.127.62.252:80"    # Replace with a working proxy (without scheme)
     ]
     logger.info(f"Using proxies: {proxies}")
 
@@ -47,8 +47,8 @@ def fetch_html(use_selenium=True, retries=3):
         for proxy in proxies:
             try:
                 logger.info(f"Loading URL with requests (attempt {attempt + 1}/{retries}, proxy: {proxy})...")
-                proxies_dict = {"http": proxy, "https": proxy}
-                response = requests.get(url, timeout=60, proxies=proxies_dict, headers=headers)
+                proxies_dict = {"http": f"http://{proxy}", "https": f"http://{proxy}"}
+                response = requests.get(url, timeout=60, proxies=proxies_dict, headers=headers, verify=False)  # Disable SSL verification
                 response.raise_for_status()
                 html_content = response.text
                 logger.info(f"URL loaded with requests in {time.time() - start_time:.2f} seconds")
@@ -73,8 +73,8 @@ def fetch_html(use_selenium=True, retries=3):
         if proxy:
             proxy_obj = Proxy()
             proxy_obj.proxy_type = ProxyType.MANUAL
-            proxy_obj.http_proxy = proxy
-            proxy_obj.ssl_proxy = proxy
+            proxy_obj.http_proxy = proxy  # Scheme removed
+            proxy_obj.ssl_proxy = proxy   # Scheme removed
             firefox_options.proxy = proxy_obj
             logger.info(f"Using Selenium with proxy: {proxy}")
 
