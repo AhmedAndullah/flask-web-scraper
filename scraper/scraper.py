@@ -41,7 +41,8 @@ def fetch_html(use_selenium=True, retries=3):
     proxies = [
         "3.127.62.252:80",  # Update with working proxies
         "188.68.52.244:80",
-        "23.88.116.40:80"
+        "23.88.116.40:80",
+        "18.185.169.150:3128"
     ]
     logger.info(f"Available proxies: {proxies}")
 
